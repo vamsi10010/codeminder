@@ -11,7 +11,7 @@
 
 **Technical Approach**: 
 - **Parsing**: Tree-sitter for language-agnostic AST parsing ensuring code is chunked by valid syntax (functions/classes) rather than arbitrary lines
-- **Embeddings**: Jina Embeddings v2 (jina-embeddings-v2-base-code) with 8k token context window for embedding entire large functions
+- **Embeddings**: sentence-transformers for local, privacy-preserving embedding generation with configurable models (default: jinaai/jina-embeddings-v2-base-code)
 - **Database**: LanceDB as embedded, serverless vector database running in-process for local operation
 - **Server**: FastMCP (Python) for Model Context Protocol implementation via decorators
 - **File Watcher**: Watchfiles (Rust-based) for automatic re-indexing with debouncing
@@ -22,7 +22,7 @@
 **Language/Version**: Python 3.12+  
 **Primary Dependencies**: 
 - Tree-sitter (AST parsing with language bindings)
-- Jina Embeddings v2 (jina-embeddings-v2-base-code for code embeddings)
+- sentence-transformers (local embedding generation with configurable models)
 - LanceDB (embedded vector database with in-memory + disk persistence)
 - FastMCP (MCP server implementation via decorators)
 - Watchfiles (Rust-based file watching with debouncing)
@@ -49,7 +49,7 @@
 **Constraints**: 
 - <100ms response time for interactive MCP operations (status checks)
 - <8GB RAM for typical developer laptop
-- Syntactic integrity: 100% (no split functions/incomplete blocks)
+- Syntactic validity: 100% (each chunk is a complete, parseable AST node)
 - File watcher: 8+ hours continuous operation without memory leaks
 
 **Scale/Scope**: 

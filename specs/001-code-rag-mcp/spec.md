@@ -34,8 +34,8 @@ An AI coding assistant (like Claude or Gemini) needs to find relevant code in a 
 
 1. **Given** an AI agent invokes the `index_codebase` MCP tool, **When** indexing completes, **Then** the system confirms success and the codebase is ready for search
 2. **Given** a codebase is indexed with AST-based chunks, **When** an AI agent queries "Find user authentication code", **Then** the system returns relevant functions/classes with full context (file path, class hierarchy, line numbers)
-3. **Given** a large class exceeds token limits, **When** the system indexes it, **Then** it recursively breaks it into methods while preserving the context path (File > Class > Method)
-4. **Given** an AI agent receives search results, **When** it attempts to use the code, **Then** the code is syntactically complete (no split functions or incomplete blocks)
+3. **Given** a large class or function exceeds token limits, **When** the system indexes it, **Then** it recursively breaks it into smaller valid AST nodes (methods, statements, expressions) while preserving the context path (File > Class > Method > Statement[N])
+4. **Given** an AI agent receives search results, **When** it attempts to use the code, **Then** each chunk is syntactically valid and can be parsed independently (complete statements or expressions)
 5. **Given** multiple relevant code units exist, **When** a query is made, **Then** results are ranked by semantic similarity with the most relevant appearing first
 
 ---
@@ -100,10 +100,10 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 
 #### Phase 1: Core Semantic Search (MVP)
 
-- **FR-001**: System MUST parse code files into Abstract Syntax Trees (AST) to identify logical boundaries such as functions, classes, and methods
-- **FR-002**: System MUST chunk code at logical boundaries, ensuring no function or class is arbitrarily split mid-definition
-- **FR-003**: System MUST apply adaptive sizing - if a logical unit fits within token limits, index it whole; otherwise recursively descend to child nodes
-- **FR-004**: System MUST tag each code chunk with metadata including file path, line numbers, and hierarchical context path (e.g., "File: auth.py > Class: UserAuth > Method: login")
+- **FR-001**: System MUST parse code files into Abstract Syntax Trees (AST) to identify logical boundaries such as functions, classes, methods, statements, and expressions
+- **FR-002**: System MUST chunk code at valid AST node boundaries, ensuring each chunk is syntactically valid (can be parsed independently)
+- **FR-003**: System MUST apply adaptive sizing - if a logical unit fits within token limits, index it whole; otherwise recursively descend to child nodes (e.g., split large functions into individual statements or expression blocks)
+- **FR-004**: System MUST tag each code chunk with metadata including file path, line numbers, hierarchical context path (e.g., "File: auth.py > Class: UserAuth > Method: login"), AST node type (e.g., function_definition, if_statement, expression), and chunk sequence number for split nodes
 - **FR-005**: System MUST embed code chunks into vector representations using a semantic embedding model suitable for code
 - **FR-006**: System MUST store embeddings in a vector database that supports similarity search, operating in-memory with optional disk persistence to avoid full re-indexing on restart
 - **FR-007**: System MUST expose an MCP-compliant server interface following the Model Context Protocol specification
@@ -133,8 +133,8 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 ### Key Entities
 
 - **CodeChunk**: Represents a logical unit of code extracted from AST parsing
-  - Attributes: unique ID, source code text, file path, start line, end line, context path (hierarchy), language, token count
-  - Relationships: belongs to a File, may have parent CodeChunk (for nested structures)
+  - Attributes: unique ID, source code text, file path, start line, end line, context path (hierarchy), AST node type, chunk sequence number (for split nodes), language, token count
+  - Relationships: belongs to a File, may have parent CodeChunk (for nested structures), may have sibling chunks (for split large nodes)
 
 - **Embedding**: Vector representation of a CodeChunk
   - Attributes: chunk ID (foreign key), vector (float array), embedding model version
@@ -159,7 +159,7 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 #### Phase 1 Success Criteria
 
 - **SC-001**: AI assistants can locate correct code files to edit given a bug description with >70% accuracy on a SWE-bench subset
-- **SC-002**: Retrieved code chunks are syntactically valid and executable with 100% integrity (no split functions or incomplete blocks)
+- **SC-002**: Retrieved code chunks are syntactically valid at AST node granularity with 100% integrity (each chunk is a complete AST node: function, statement, or expression)
 - **SC-003**: Search queries return results in under 1 second for codebases up to 100,000 lines of code
 - **SC-004**: AI assistants can solve HumanEval problems using only retrieved "hidden" helper functions with >60% success rate
 - **SC-005**: The MCP server successfully responds to 99% of valid search requests without crashes or errors
@@ -226,7 +226,7 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 
 ## Constraints
 
-- Must maintain syntactic integrity - no partial functions or incomplete code blocks in results
+- Must maintain syntactic integrity - each chunk must be a valid, parseable AST node (function, statement, or expression)
 - Must preserve hierarchical context in all returned chunks (file > class > method path)
 - Must respond to search queries within 1 second for typical codebases
 - Must use existing MCP protocol standards (no custom extensions in Phase 1)

@@ -11,7 +11,7 @@ Get CodeMinder up and running in under 5 minutes.
 - **Python**: 3.12 or higher
 - **uv**: Fast Python package installer (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 - **Environment**: Linux or macOS (Windows via WSL)
-- **API Key**: Jina AI API key (free tier available at https://jina.ai/)
+- **Hardware**: ~2GB RAM for default embedding model (less for lightweight models)
 
 ---
 
@@ -30,30 +30,20 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install -e .
 ```
 
-### 2. Configure Environment
-
-```bash
-# Set Jina API key
-export JINA_API_KEY="your-api-key-here"
-
-# Or add to .env file
-echo "JINA_API_KEY=your-api-key-here" > .env
-```
-
-### 3. Create Configuration File
+### 2. Create Configuration File
 
 Create `.codeminder.json` in your codebase root:
 
 ```json
 {
   "codebase_path": ".",
+  "embedding_model": "jinaai/jina-embeddings-v2-base-code",
   "token_limit": 2048,
   "max_search_results": 20,
   "concurrency_limit": 4,
   "debounce_ms": 500,
   "log_level": "INFO",
   "persist_index": true,
-  "jina_api_key": "${JINA_API_KEY}",
   "excluded_patterns": [
     "*.pyc",
     "__pycache__",
@@ -67,6 +57,9 @@ Create `.codeminder.json` in your codebase root:
 
 **Configuration Options**:
 - `codebase_path`: Directory to index (relative or absolute path)
+- `embedding_model`: HuggingFace model ID (default: jinaai/jina-embeddings-v2-base-code)
+  - Lightweight: `microsoft/codebert-base` (~500MB)
+  - Budget: `sentence-transformers/all-MiniLM-L6-v2` (~80MB)
 - `token_limit`: Max tokens per code chunk (default: 2048)
 - `max_search_results`: Number of search results to return (default: 20)
 - `concurrency_limit`: Parallel file processing (1-16, default: 4)
@@ -114,9 +107,6 @@ Edit `~/.config/claude/claude_desktop_config.json`:
     "codeminder": {
       "command": "python",
       "args": ["-m", "codeminder.server"],
-      "env": {
-        "JINA_API_KEY": "your-api-key-here"
-      },
       "workingDirectory": "/path/to/your/codebase"
     }
   }
@@ -151,10 +141,11 @@ Use the index_codebase tool to index my codebase.
 ```
 
 **What happens**:
+- Downloads embedding model on first run (~1GB, cached to `~/.cache/huggingface/`)
 - Scans codebase for Python files (.py)
 - Parses each file into AST (Abstract Syntax Tree)
 - Chunks code at logical boundaries (functions, classes, methods)
-- Generates embeddings using Jina AI
+- Generates embeddings locally using sentence-transformers
 - Stores in LanceDB (`.codeminder/vector_db/`)
 - Starts file watcher for automatic updates
 
@@ -225,7 +216,7 @@ cd project
 cat > .codeminder.json << 'EOF'
 {
   "codebase_path": ".",
-  "jina_api_key": "${JINA_API_KEY}"
+  "embedding_model": "jinaai/jina-embeddings-v2-base-code"
 }
 EOF
 
@@ -365,6 +356,13 @@ grep "src/auth.py" .codeminder/codeminder.log
 
 ### For Large Codebases (>100k LOC)
 
+**Use Lightweight Model**:
+```json
+{
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2"
+}
+```
+
 **Increase Concurrency**:
 ```json
 {
@@ -442,7 +440,7 @@ grep "src/auth.py" .codeminder/codeminder.log
 - **Documentation**: `/specs/001-code-rag-mcp/`
 - **Issues**: https://github.com/your-org/codeminder/issues
 - **MCP Protocol**: https://modelcontextprotocol.io/
-- **Jina AI**: https://jina.ai/embeddings/
+- **HuggingFace Models**: https://huggingface.co/models?pipeline_tag=sentence-similarity
 
 ---
 
@@ -450,7 +448,7 @@ grep "src/auth.py" .codeminder/codeminder.log
 
 **3 Steps to Get Started**:
 1. Install dependencies: `uv pip install -e .`
-2. Configure: Create `.codeminder.json` with API key
+2. Configure: Create `.codeminder.json` with embedding model preference
 3. Run: `python -m codeminder.server` and connect AI assistant
 
 **Key Commands**:

@@ -30,31 +30,43 @@ This document consolidates findings for all NEEDS CLARIFICATION items from the t
 
 ---
 
-## 2. Jina Embeddings v2 for Code Embeddings
+## 2. sentence-transformers for Local Code Embeddings
 
-**Decision**: Use jina-embeddings-v2-base-code via Jina AI API or local deployment
+**Decision**: Use sentence-transformers with configurable models for local embedding generation
 
 **Rationale**:
-- **8k token context window**: Can embed entire large functions without truncation
-- **Code-specific training**: Fine-tuned on code semantics, not just natural language
-- **Dimensionality**: 768-dimensional vectors (good balance of quality and performance)
-- **License**: Apache 2.0 (commercial-friendly)
+- **No API dependency**: Runs completely offline, no external service required
+- **Privacy**: Code never leaves local machine (critical for proprietary codebases)
+- **Configurable**: Users can select models based on their hardware capabilities
+- **No rate limits**: Process as much code as needed without API quotas
+- **Cost**: Free to run, no per-request charges
+
+**Recommended Models**:
+- **Default**: `jinaai/jina-embeddings-v2-base-code` (768-dim, 8k context, ~1GB RAM)
+- **Lightweight**: `microsoft/codebert-base` (768-dim, 512 tokens, ~500MB RAM)
+- **High-quality**: `Salesforce/codet5-base` (768-dim, code-optimized, ~900MB RAM)
+- **Budget**: `sentence-transformers/all-MiniLM-L6-v2` (384-dim, fast, ~80MB RAM)
 
 **Alternatives Considered**:
-- CodeBERT: 512 token limit (too restrictive for large functions)
-- OpenAI text-embedding-ada-002: General-purpose, not code-optimized, requires API key
-- StarCoder Embeddings: Larger model, higher resource requirements
+- Jina AI API: Requires API key, network dependency, costs money at scale
+- OpenAI embeddings: Same issues plus not code-optimized
+- Custom-trained model: Too complex for initial release
 
 **Implementation Notes**:
-- Use Jina AI API for simplicity (requires `JINA_API_KEY` env var)
-- Fallback option: Local deployment via transformers library (slower but no external dependency)
+- Install sentence-transformers via pip (includes PyTorch)
+- Model auto-downloads on first run to `~/.cache/huggingface/`
 - Batch embedding for efficiency (process multiple chunks together)
+- Device selection: Auto-detect GPU if available, fallback to CPU
 
-**API Example**:
+**Code Example**:
 ```python
-from jina import Client
-client = Client(host='https://api.jina.ai')
-embeddings = client.post('/v1/embeddings', inputs=[code_chunk])
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer(
+    config.embedding_model,
+    device='cuda' if torch.cuda.is_available() else 'cpu'
+)
+embeddings = model.encode(code_chunks, batch_size=32, show_progress_bar=True)
 ```
 
 ---
@@ -162,36 +174,49 @@ async def watch_codebase(path: str):
 2. **Traverse**: Depth-first search starting from root
 3. **Size Check**:
    - If node's token count ≤ limit (2048): Yield as single chunk, stop descending
-   - If node > limit: Descend into named children (split class into methods)
-   - If leaf node > limit: Force-split with warning (massive string literal edge case)
-4. **Context Tagging**: Prepend each chunk with `File: path.py > Class: Name > Method: func`
+   - If node > limit: Descend into named children (split class into methods, split function into statements)
+   - If statement/expression > limit: Descend further (split compound statements, expressions)
+   - If atomic node > limit: Yield with warning (rare case: extremely long strings or comments)
+4. **Context Tagging**: Prepend each chunk with `File: path.py > Class: Name > Method: func[N]` where [N] is sequence number for split nodes
+5. **Chunk Identification**: Assign unique IDs and track AST node type (function_definition, if_statement, expression, etc.)
 
 **Rationale**:
-- **Syntactic integrity**: Never splits mid-function (100% requirement from spec)
-- **Adaptive**: Handles both small utilities and large frameworks gracefully
-- **Context preservation**: LLM understands code hierarchy from tags
+- **Syntactic validity**: Each chunk is a complete, parseable AST node (function, class, statement, or expression)
+- **Adaptive granularity**: Splits large functions into individual statements or expression blocks when needed
+- **Context preservation**: LLM understands code hierarchy from tags including sequence numbers for split nodes
 
 **Implementation Pseudocode**:
 ```python
-def chunk_ast_node(node, context_path="", max_tokens=2048):
+def chunk_ast_node(node, context_path="", max_tokens=2048, seq_num=0):
     code = node.text.decode()
     tokens = count_tokens(code)
     
     if tokens <= max_tokens:
         yield CodeChunk(
             code=code,
-            context_path=context_path,
+            context_path=f"{context_path}[{seq_num}]" if seq_num > 0 else context_path,
+            node_type=node.type,
             start_line=node.start_point[0],
-            end_line=node.end_point[0]
+            end_line=node.end_point[0],
+            sequence_number=seq_num
         )
     elif node.named_children:
-        for child in node.named_children:
-            child_context = f"{context_path} > {child.type}:{child.name}"
-            yield from chunk_ast_node(child, child_context, max_tokens)
+        # Recursively split into child nodes (methods, statements, expressions)
+        for idx, child in enumerate(node.named_children):
+            child_name = getattr(child, 'name', None) or f"{child.type}"
+            child_context = f"{context_path} > {child_name}"
+            yield from chunk_ast_node(child, child_context, max_tokens, idx)
     else:
-        # Force-split oversized leaf node
-        logger.warning(f"Forcing split of {context_path}")
-        yield force_split_chunk(node, context_path, max_tokens)
+        # Atomic node exceeding limit (rare: very long string/comment)
+        logger.warning(f"Atomic node exceeds limit: {context_path}")
+        yield CodeChunk(
+            code=code,
+            context_path=f"{context_path}[OVERSIZED]",
+            node_type=node.type,
+            start_line=node.start_point[0],
+            end_line=node.end_point[0],
+            sequence_number=0
+        )
 ```
 
 ---
@@ -243,20 +268,20 @@ async def reindex_file(file_path: str):
 ```json
 {
   "codebase_path": ".",
+  "embedding_model": "jinaai/jina-embeddings-v2-base-code",
   "token_limit": 2048,
   "max_search_results": 20,
   "concurrency_limit": 4,
   "debounce_ms": 500,
   "log_level": "INFO",
-  "persist_index": true,
-  "jina_api_key": "${JINA_API_KEY}"
+  "persist_index": true
 }
 ```
 
 **Rationale**:
 - JSON: Widely understood, easy to edit
 - Sensible defaults: Works out-of-box for most use cases
-- Environment variable support: `${VAR_NAME}` syntax for secrets
+- `embedding_model`: Any HuggingFace model ID (allows user customization)
 
 ---
 
@@ -294,7 +319,7 @@ async def reindex_file(file_path: str):
 | Component | Technology | Key Benefit |
 |-----------|-----------|-------------|
 | AST Parsing | Tree-sitter | Multi-language, incremental, error-resilient |
-| Embeddings | Jina v2 (code) | 8k context, code-optimized |
+| Embeddings | sentence-transformers | Local, private, configurable models |
 | Vector DB | LanceDB | Embedded, persistent, performant |
 | MCP Server | FastMCP | Decorator-based, async, type-safe |
 | File Watcher | Watchfiles | Rust-fast, debouncing, cross-platform |
