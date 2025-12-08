@@ -19,13 +19,13 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create project structure with src/codeminder/ layout per plan.md
-- [ ] T002 Initialize Python 3.12+ project with pyproject.toml using uv
+- [x] T001 Create project structure with src/codeminder/ layout per plan.md
+- [x] T002 Initialize Python 3.12+ project with pyproject.toml using uv
 - [ ] T003 [P] Configure ruff (linting/formatting) in pyproject.toml
 - [ ] T004 [P] Configure mypy (type checking) with strict mode in pyproject.toml
 - [ ] T005 [P] Configure pytest with coverage plugin in pyproject.toml
 - [ ] T006 Create .codeminder.json.example configuration template with all options
-- [ ] T007 [P] Setup .gitignore (.codeminder/, .venv/, __pycache__, *.pyc)
+- [x] T007 [P] Setup .gitignore (.codeminder/, .venv/, __pycache__, *.pyc)
 - [ ] T008 Create README.md with project overview and quickstart reference
 
 ---

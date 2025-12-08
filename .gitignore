@@ -210,5 +210,8 @@ __marimo__/
 .specify/
 .github/
 
-VSCode
+# VSCode
 .vscode/
+
+# Codeminder
+.codeminder/
