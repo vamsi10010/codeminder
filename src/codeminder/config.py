@@ -60,7 +60,7 @@ class Configuration(BaseModel):
 
     @model_validator(mode="after")
     def validate_token_limit(self) -> "Configuration":
-        model = SentenceTransformer(self.embedding_model)
+        model = SentenceTransformer(self.embedding_model, trust_remote_code=True)
         max_length = model.get_max_seq_length()
         if max_length is None:
             raise ValueError("Could not determine model's maximum sequence length")

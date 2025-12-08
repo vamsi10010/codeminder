@@ -33,7 +33,7 @@ class Embedder:
     def load_model(self) -> None:
         try:
             logger.info(f"Loading embedding model: {self.model_name}")
-            self._model = SentenceTransformer(self.model_name, device=self.device)
+            self._model = SentenceTransformer(self.model_name, device=self.device, trust_remote_code=True)
             logger.info(f"Model loaded successfully on {self.device}")
         except Exception as e:
             raise EmbeddingError(
