@@ -290,10 +290,12 @@ async def reindex_file(file_path: str):
 **Decision**: Define error code enum with recovery suggestions
 
 **Error Code Categories**:
-- `PARSE_ERROR`: Syntax error in source file (fallback to line-based chunking)
-- `DB_UNAVAILABLE`: Vector database connection failed (check `.codeminder/` permissions)
-- `EMBEDDING_ERROR`: Failed to generate embeddings (check API key, network)
 - `CONFIG_ERROR`: Invalid `.codeminder.json` (show validation errors)
+- `PARSE_ERROR`: Syntax error in source file (fallback to line-based chunking)
+- `EMBEDDING_ERROR`: Failed to generate embeddings (model download/loading failure, GPU OOM)
+- `DB_UNAVAILABLE`: Vector database connection failed (check `.codeminder/` permissions)
+- `INDEX_NOT_READY`: Search requested before initial indexing complete (call index_codebase first)
+- `SEARCH_ERROR`: Search operation failed (invalid query, database error)
 - `WATCHER_ERROR`: File watcher initialization failed (check file permissions)
 
 **Response Format**:

@@ -178,14 +178,14 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 
 ## Assumptions
 
-1. **Embedding Model**: Assume use of a pre-trained code embedding model (e.g., CodeBERT, StarEncoder) or OpenAI's text-embedding models as a starting point
-2. **Token Limits**: Assume a default token limit of 512 tokens per chunk (configurable), aligned with typical embedding model constraints
-3. **Vector Database**: Assume use of ChromaDB or FAISS for vector storage with in-memory operation and optional disk persistence (ChromaDB preferred for built-in persistence support)
+1. **Embedding Model**: Use sentence-transformers for local embedding generation with configurable models (default: jinaai/jina-embeddings-v2-base-code with 768-dim, 8k context). No external API required.
+2. **Token Limits**: Default token limit of 2048 tokens per chunk (configurable), supporting large functions while enabling adaptive splitting to statements/expressions when needed
+3. **Vector Database**: Use LanceDB for embedded vector storage with in-memory operation and disk persistence to `.codeminder/vector_db/` (survives restarts, no separate server)
 4. **MCP Protocol**: Assume the Model Context Protocol specification is publicly documented and stable
-5. **Initial Language**: Phase 1 focuses exclusively on Python; AST parsing uses Python's built-in `ast` module
+5. **Initial Language**: Phase 1 focuses exclusively on Python; AST parsing uses Tree-sitter with Python bindings (enables Phase 2 multi-language support)
 6. **File System**: Assume POSIX-compliant file systems (Linux/macOS primary targets; Windows support via path normalization)
-7. **Concurrency**: Assume parallel file processing in Phase 1 with configurable concurrency limit (default 4, range 1-16) for handling batch file changes
-8. **Deployment**: Assume the MCP server runs locally on the developer's machine with configuration via .codeminder.json file in the codebase root, not as a remote service
+7. **Concurrency**: Parallel file processing in Phase 1 with configurable concurrency limit (default 4, range 1-16) using asyncio.Semaphore for handling batch file changes
+8. **Deployment**: The MCP server runs locally on the developer's machine with configuration via .codeminder.json file in the codebase root, not as a remote service
 9. **Security**: Assume the codebase being indexed is trusted; no sandboxing or malicious code protection in Phase 1
 
 ## Scope Boundaries
@@ -217,12 +217,16 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 ## Dependencies
 
 - Python 3.12+ runtime environment
-- AST parsing library (Python built-in `ast` module for Python code)
-- Embedding model (OpenAI API, HuggingFace Transformers, or similar)
-- Vector database (ChromaDB, FAISS, or Qdrant)
-- MCP SDK/library for Python (if available) or raw JSON-RPC implementation
-- File watching library (watchdog for Python)
-- Tree-sitter (for multi-language AST parsing in Phase 2)
+- Tree-sitter (AST parsing with Python bindings - tree-sitter + tree-sitter-python)
+- sentence-transformers (local embedding generation with configurable models, includes PyTorch)
+- LanceDB (embedded vector database with in-memory + disk persistence)
+- FastMCP (MCP server framework with decorator-based tool registration)
+- Watchfiles (Rust-based file watching library with built-in debouncing)
+- tiktoken (token counting for adaptive chunking algorithm)
+- pytest (testing framework with >80% coverage target)
+- ruff (linting and formatting)
+- mypy (type checking with strict mode)
+- uv (package management and virtual environments)
 
 ## Constraints
 
