@@ -38,21 +38,21 @@
 
 ### Configuration & Utilities
 
-- [ ] T009 Implement Configuration model in src/codeminder/config.py with Pydantic validation
-- [ ] T010 [P] Implement structured logging in src/codeminder/utils/logger.py (JSON format, levels, file+stderr)
-- [ ] T011 [P] Implement error classes with codes in src/codeminder/utils/errors.py (CONFIG_ERROR, PARSE_ERROR, DB_UNAVAILABLE, EMBEDDING_ERROR, WATCHER_ERROR, INDEX_NOT_READY, SEARCH_ERROR)
+- [x] T009 Implement Configuration model in src/codeminder/config.py with Pydantic validation
+- [x] T010 [P] Implement structured logging in src/codeminder/utils/logger.py (JSON format, levels, file+stderr)
+- [x] T011 [P] Implement error classes with codes in src/codeminder/utils/errors.py (CONFIG_ERROR, PARSE_ERROR, DB_UNAVAILABLE, EMBEDDING_ERROR, WATCHER_ERROR, INDEX_NOT_READY, SEARCH_ERROR)
 
 ### Data Models
 
-- [ ] T012 [P] Create File entity in src/codeminder/storage/models.py with UUID, paths, language, parse_status, timestamps
-- [ ] T013 [P] Create CodeChunk entity in src/codeminder/storage/models.py with UUID, file_id, source_code, context_path, lines, token_count, node_type, sequence_number, parent_id
-- [ ] T014 [P] Create Embedding entity in src/codeminder/storage/models.py with chunk_id, vector, model_version, created_at
+- [x] T012 [P] Create File entity in src/codeminder/storage/models.py with UUID, paths, language, parse_status, timestamps
+- [x] T013 [P] Create CodeChunk entity in src/codeminder/storage/models.py with UUID, file_id, source_code, context_path, lines, token_count, node_type, sequence_number
+- [x] T014 [P] Create Embedding entity in src/codeminder/storage/models.py with chunk_id, vector, model_version, created_at
 
 ### Core Components (No User Story Yet)
 
-- [ ] T015 [P] Implement token counter in src/codeminder/parser/token_counter.py using tiktoken
-- [ ] T016 Implement LanceDB connection in src/codeminder/storage/vector_db.py with connect(), create_table(), persistence handling
-- [ ] T017 Implement sentence-transformers loader in src/codeminder/embeddings/embedder.py with model initialization, device selection (GPU/CPU)
+- [x] T015 [P] Implement token counter in src/codeminder/parser/token_counter.py using tiktoken
+- [x] T016 Implement LanceDB connection in src/codeminder/storage/vector_db.py with connect(), create_table(), persistence handling
+- [x] T017 Implement sentence-transformers loader in src/codeminder/embeddings/embedder.py with model initialization, device selection (GPU/CPU)
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -71,7 +71,7 @@
 - [ ] T020 [P] [US1] Integration test for end-to-end indexing flow in tests/integration/test_indexing_flow.py (scan files, parse AST, chunk, embed, store)
 - [ ] T021 [P] [US1] Integration test for end-to-end search flow in tests/integration/test_search_flow.py (query embedding, vector search, result formatting)
 - [ ] T022 [P] [US1] Unit test for AST parser in tests/unit/test_ast_parser.py (Tree-sitter parsing, error handling)
-- [ ] T023 [P] [US1] Unit test for chunker in tests/unit/test_chunker.py (adaptive sizing, context paths, sequence numbers, syntactic validity)
+- [ ] T023 [P] [US1] Unit test for chunker in tests/unit/test_chunker.py (adaptive sizing, context path construction with byte ranges, sequence numbers, syntactic validity)
 - [ ] T024 [P] [US1] Unit test for embedder in tests/unit/test_embedder.py (batch encoding, model loading, error handling)
 - [ ] T025 [P] [US1] Unit test for vector_db in tests/unit/test_vector_db.py (CRUD operations, similarity search)
 
@@ -80,8 +80,8 @@
 #### AST Parsing & Chunking
 
 - [ ] T026 [P] [US1] Implement Tree-sitter parser in src/codeminder/parser/ast_parser.py (parse file, handle syntax errors)
-- [ ] T027 [US1] Implement adaptive chunker in src/codeminder/parser/chunker.py (recursive descent, token counting, sequence numbering, context path construction) - depends on T026
-- [ ] T028 [US1] Add split node handling for large functions in src/codeminder/parser/chunker.py (statements, expressions, node type tracking)
+- [ ] T027 [US1] Implement adaptive chunker in src/codeminder/parser/chunker.py (recursive descent, token counting, sequence numbering, context path construction: semantic_path:[byte_start:byte_end]#sequence) - depends on T026
+- [ ] T028 [US1] Add split node handling for large functions in src/codeminder/parser/chunker.py (statements, expressions, node type tracking, extract identifiers for semantic path)
 
 #### Embedding Generation
 
