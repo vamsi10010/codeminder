@@ -21,9 +21,9 @@
 
 - [x] T001 Create project structure with src/codeminder/ layout per plan.md
 - [x] T002 Initialize Python 3.12+ project with pyproject.toml using uv
-- [ ] T003 [P] Configure ruff (linting/formatting) in pyproject.toml
-- [ ] T004 [P] Configure mypy (type checking) with strict mode in pyproject.toml
-- [ ] T005 [P] Configure pytest with coverage plugin in pyproject.toml
+- [x] T003 [P] Configure ruff (linting/formatting) in pyproject.toml
+- [x] T004 [P] Configure mypy (type checking) with strict mode in pyproject.toml
+- [x] T005 [P] Configure pytest with coverage plugin in pyproject.toml
 - [x] T006 Create .codeminder.json.example configuration template with all options
 - [x] T007 [P] Setup .gitignore (.codeminder/, .venv/, __pycache__, *.pyc)
 - [x] T008 Create README.md with project overview and quickstart reference
@@ -66,14 +66,14 @@
 
 ### Tests for User Story 1 (Write FIRST - Red-Green-Refactor) ⚠️
 
-- [ ] T018 [P] [US1] Contract test for index_codebase tool in tests/contract/test_mcp_index.py (request format, success response, error responses)
-- [ ] T019 [P] [US1] Contract test for search_code tool in tests/contract/test_mcp_search.py (request format, result structure, ranking)
-- [ ] T020 [P] [US1] Integration test for end-to-end indexing flow in tests/integration/test_indexing_flow.py (scan files, parse AST, chunk, embed, store)
-- [ ] T021 [P] [US1] Integration test for end-to-end search flow in tests/integration/test_search_flow.py (query embedding, vector search, result formatting)
-- [ ] T022 [P] [US1] Unit test for AST parser in tests/unit/test_ast_parser.py (Tree-sitter parsing, error handling)
-- [ ] T023 [P] [US1] Unit test for chunker in tests/unit/test_chunker.py (adaptive sizing, context path construction with byte ranges, sequence numbers, syntactic validity)
-- [ ] T024 [P] [US1] Unit test for embedder in tests/unit/test_embedder.py (batch encoding, model loading, error handling)
-- [ ] T025 [P] [US1] Unit test for vector_db in tests/unit/test_vector_db.py (CRUD operations, similarity search)
+- [X] T018 [P] [US1] Contract test for index_codebase tool in tests/contract/test_mcp_index.py (request format, success response, error responses)
+- [X] T019 [P] [US1] Contract test for search_code tool in tests/contract/test_mcp_search.py (request format, result structure, ranking)
+- [X] T020 [P] [US1] Integration test for end-to-end indexing flow in tests/integration/test_indexing_flow.py (scan files, parse AST, chunk, embed, store)
+- [X] T021 [P] [US1] Integration test for end-to-end search flow in tests/integration/test_search_flow.py (query embedding, vector search, result formatting)
+- [X] T022 [P] [US1] Unit test for AST parser in tests/unit/test_ast_parser.py (Tree-sitter parsing, error handling)
+- [X] T023 [P] [US1] Unit test for chunker in tests/unit/test_chunker.py (adaptive sizing, context path construction with byte ranges, sequence numbers, syntactic validity)
+- [X] T024 [P] [US1] Unit test for embedder in tests/unit/test_embedder.py (batch encoding, model loading, error handling)
+- [X] T025 [P] [US1] Unit test for vector_db in tests/unit/test_vector_db.py (CRUD operations, similarity search)
 
 ### Implementation for User Story 1
 

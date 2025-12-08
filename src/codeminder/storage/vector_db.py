@@ -1,10 +1,11 @@
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any
+from uuid import UUID
+
 import lancedb
+import pyarrow as pa
 from lancedb import DBConnection
 from lancedb.table import Table
-import pyarrow as pa
-from uuid import UUID
 
 from ..utils.errors import DBUnavailableError
 from ..utils.logger import get_logger
@@ -16,8 +17,8 @@ class VectorDB:
     def __init__(self, db_path: str = ".codeminder/vector_db", persist: bool = True):
         self.db_path = db_path
         self.persist = persist
-        self._db: Optional[DBConnection] = None
-        self._table: Optional[Table] = None
+        self._db: DBConnection | None = None
+        self._table: Table | None = None
 
     def connect(self) -> None:
         try:
@@ -28,16 +29,14 @@ class VectorDB:
             else:
                 self._db = lancedb.connect(":memory:")
 
-            logger.info(
-                f"Connected to LanceDB at {self.db_path if self.persist else 'memory'}"
-            )
+            logger.info(f"Connected to LanceDB at {self.db_path if self.persist else 'memory'}")
         except Exception as e:
             raise DBUnavailableError(
                 f"Failed to connect to database: {str(e)}", {"db_path": self.db_path}
-            )
+            ) from e
 
     def create_table(
-        self, table_name: str = "code_chunks", schema: Optional[pa.Schema] = None
+        self, table_name: str = "code_chunks", schema: pa.Schema | None = None
     ) -> None:
         if not self._db:
             raise DBUnavailableError("Database not connected")
@@ -74,9 +73,9 @@ class VectorDB:
         except Exception as e:
             raise DBUnavailableError(
                 f"Failed to create/open table: {str(e)}", {"table_name": table_name}
-            )
+            ) from e
 
-    def insert_chunks(self, chunks: List[Dict[str, Any]]) -> None:
+    def insert_chunks(self, chunks: list[dict[str, Any]]) -> None:
         if not self._table:
             raise DBUnavailableError("Table not initialized")
 
@@ -86,11 +85,9 @@ class VectorDB:
         except Exception as e:
             raise DBUnavailableError(
                 f"Failed to insert chunks: {str(e)}", {"chunk_count": len(chunks)}
-            )
+            ) from e
 
-    def search(
-        self, query_vector: List[float], limit: int = 20
-    ) -> List[Dict[str, Any]]:
+    def search(self, query_vector: list[float], limit: int = 20) -> list[dict[str, Any]]:
         if not self._table:
             raise DBUnavailableError("Table not initialized")
 
@@ -99,7 +96,7 @@ class VectorDB:
             logger.info(f"Search returned {len(results)} results")
             return results
         except Exception as e:
-            raise DBUnavailableError(f"Failed to search: {str(e)}", {"limit": limit})
+            raise DBUnavailableError(f"Failed to search: {str(e)}", {"limit": limit}) from e
 
     def delete_by_file_id(self, file_id: UUID) -> None:
         if not self._table:
@@ -111,9 +108,9 @@ class VectorDB:
         except Exception as e:
             raise DBUnavailableError(
                 f"Failed to delete chunks: {str(e)}", {"file_id": str(file_id)}
-            )
+            ) from e
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         if not self._table:
             raise DBUnavailableError("Table not initialized")
 
@@ -121,12 +118,10 @@ class VectorDB:
             count = self._table.count_rows()
             return {
                 "total_chunks": count,
-                "table_name": (
-                    self._table.name if hasattr(self._table, "name") else "code_chunks"
-                ),
+                "table_name": (self._table.name if hasattr(self._table, "name") else "code_chunks"),
             }
         except Exception as e:
-            raise DBUnavailableError(f"Failed to get stats: {str(e)}")
+            raise DBUnavailableError(f"Failed to get stats: {str(e)}") from e
 
     def close(self) -> None:
         self._db = None

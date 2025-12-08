@@ -1,8 +1,7 @@
+
 import tiktoken
-from typing import Optional
 
-
-_encoding: Optional[tiktoken.Encoding] = None
+_encoding: tiktoken.Encoding | None = None
 
 
 def get_encoding() -> tiktoken.Encoding:

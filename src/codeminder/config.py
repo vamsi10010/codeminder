@@ -1,9 +1,7 @@
-from datetime import datetime
-from pathlib import Path
-from typing import Optional
-from pydantic import BaseModel, Field, field_validator, model_validator
 import json
+from pathlib import Path
 
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sentence_transformers import SentenceTransformer
 
 
@@ -13,9 +11,7 @@ class Configuration(BaseModel):
         default="jinaai/jina-embeddings-v2-base-code",
         description="sentence-transformers model name",
     )
-    token_limit: int = Field(
-        default=2048, ge=1, le=8192, description="Maximum tokens per chunk"
-    )
+    token_limit: int = Field(default=2048, ge=1, le=8192, description="Maximum tokens per chunk")
     max_search_results: int = Field(
         default=20,
         ge=1,
@@ -76,7 +72,7 @@ class Configuration(BaseModel):
         if not path.exists():
             return cls()
 
-        with open(path, "r") as f:
+        with open(path) as f:
             data = json.load(f)
         return cls(**data)
 

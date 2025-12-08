@@ -1,9 +1,8 @@
+import json
 import logging
 import sys
-import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 
 class JSONFormatter(logging.Formatter):
@@ -25,7 +24,7 @@ class JSONFormatter(logging.Formatter):
 
 
 def setup_logger(
-    name: str = "codeminder", level: str = "INFO", log_file: Optional[str] = None
+    name: str = "codeminder", level: str = "INFO", log_file: str | None = None
 ) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, level.upper()))

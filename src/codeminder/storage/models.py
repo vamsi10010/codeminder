@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List
 from uuid import UUID, uuid4
 
 
@@ -20,7 +19,7 @@ class File:
     last_modified: datetime = field(default_factory=datetime.now)
     last_indexed: datetime = field(default_factory=datetime.now)
     parse_status: ParseStatus = ParseStatus.SUCCESS
-    error_message: Optional[str] = None
+    error_message: str | None = None
     chunk_count: int = 0
 
     def to_dict(self) -> dict:
@@ -71,7 +70,7 @@ class CodeChunk:
 class Embedding:
     embedding_id: UUID = field(default_factory=uuid4)
     chunk_id: UUID = field(default_factory=uuid4)
-    vector: List[float] = field(default_factory=list)
+    vector: list[float] = field(default_factory=list)
     model_version: str = ""
     created_at: datetime = field(default_factory=datetime.now)
 
