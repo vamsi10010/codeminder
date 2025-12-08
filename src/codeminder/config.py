@@ -1,8 +1,10 @@
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 import json
+
+from sentence_transformers import SentenceTransformer
 
 
 class Configuration(BaseModel):
@@ -55,6 +57,18 @@ class Configuration(BaseModel):
         if upper_v not in valid_levels:
             raise ValueError(f"Invalid log level: {v}. Must be one of {valid_levels}")
         return upper_v
+
+    @model_validator(mode="after")
+    def validate_token_limit(self) -> "Configuration":
+        model = SentenceTransformer(self.embedding_model)
+        max_length = model.get_max_seq_length()
+        if max_length is None:
+            raise ValueError("Could not determine model's maximum sequence length")
+        elif self.token_limit > max_length:
+            raise ValueError(
+                f"Token limit {self.token_limit} exceeds model's maximum sequence length of {max_length}"
+            )
+        return self
 
     @classmethod
     def load_from_file(cls, config_path: str = ".codeminder.json") -> "Configuration":
