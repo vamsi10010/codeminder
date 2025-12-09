@@ -15,7 +15,7 @@ This folder contains a minimal, runnable evaluation setup for CodeMinder search.
   uv venv && source .venv/bin/activate
   uv pip install -e .
   ```
-- Ensure the chosen embedding model is available (default is `sentence-transformers/all-MiniLM-L6-v2`).
+- Ensure the chosen embedding model is available (default is `jinaai/jina-embeddings-v2-base-code`).
 
 ## Quick start (use the bundled fixture)
 From the repo root:
@@ -30,7 +30,7 @@ Both commands default to the toy fixture and goldens in this folder.
 python eval/run_ir_eval.py \
   --codebase /path/to/your/codebase \
   --golden /path/to/golden_queries.json \
-  --embedding-model sentence-transformers/all-MiniLM-L6-v2 \
+  --embedding-model jinaai/jina-embeddings-v2-base-code \
   --max-results 5 \
   --token-limit 512
 ```
@@ -41,7 +41,7 @@ Outputs JSON with `success_rate_at_1`, `success_rate_at_k`, `mean_mrr`, and per-
 python eval/run_chunking_compare.py \
   --codebase /path/to/your/codebase \
   --golden /path/to/golden_queries.json \
-  --embedding-model sentence-transformers/all-MiniLM-L6-v2 \
+  --embedding-model jinaai/jina-embeddings-v2-base-code \
   --max-results 5 \
   --token-limit 512 \
   --line-span 40

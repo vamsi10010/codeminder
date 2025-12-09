@@ -57,7 +57,7 @@ async def main() -> None:
     parser.add_argument(
         "--embedding-model",
         type=str,
-        default="sentence-transformers/all-MiniLM-L6-v2",
+        default="jinaai/jina-embeddings-v2-base-code",
         help="SentenceTransformers model name",
     )
     parser.add_argument("--max-results", type=int, default=5, help="Top-k to return")
