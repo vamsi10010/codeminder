@@ -1,17 +1,10 @@
-# CodeMinder
+# Quickstart Guide: CodeMinder
 
-**Semantic Code Search via Model Context Protocol (MCP)**
+**Phase 1 Output** | **Date**: 2025-12-07
 
-CodeMinder is an MCP server that enables AI assistants to understand and navigate your codebase using semantic search. It bridges the "context gap" by providing intelligent, syntax-aware code retrieval through AST-based chunking and local embeddings.
+Get CodeMinder up and running in under 5 minutes.
 
-## Features
-
-- 🔍 **Semantic Code Search**: Ask natural language questions, get relevant code snippets
-- 🌳 **AST-Based Chunking**: Code is split at logical boundaries (functions, classes) ensuring 100% syntactic validity
-- 🔒 **Privacy-First**: All processing happens locally - your code never leaves your machine
-- 🚀 **Fast & Efficient**: <1s search for codebases up to 100k LOC, automatic startup reconciliation
-- 🔌 **MCP Compatible**: Works with Claude Desktop, Cursor IDE, and any MCP-compatible AI assistant
-- 💾 **Persistent Index**: LanceDB storage survives restarts, only re-indexes changed files
+---
 
 ## Prerequisites
 
@@ -50,6 +43,7 @@ Create `.codeminder.json` in your codebase root:
   "max_search_results": 20,
   "concurrency_limit": 4,
   "debounce_ms": 500,
+  "log_level": "INFO",
   "persist_index": true
 }
 ```
@@ -94,13 +88,13 @@ python -m codeminder.mcp_server
 [INFO] Configuration loaded from .codeminder.json
 [INFO] Connected to LanceDB at .codeminder/vector_db
 [INFO] Loaded file registry with 142 files
-[INFO] Startup reconciliation: 2 files modified, 0 deleted, 0 new
-[INFO] Re-indexing 2 modified files...
+[INFO] Reconciliation actions: 0 new, 2 modified, 0 deleted
+[INFO] Startup reconciliation: 3 files modified, 1 deleted, 0 new
+[INFO] Re-indexing 3 modified files...
 [INFO] Reconciliation complete in 4.2 seconds
+[INFO] File watcher started: /home/user/project
 [INFO] MCP server listening on stdio
 ```
-
-**Note**: The server runs in the foreground and communicates via stdio (standard input/output) using the Model Context Protocol. It's designed to be started by MCP clients (like Claude Desktop), not run directly by users.
 
 ### Connect AI Assistant
 
@@ -117,20 +111,8 @@ Edit `~/.config/claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "codeminder": {
-      "command": "/path/to/codeminder/.venv/bin/codeminder",
-      "workingDirectory": "/path/to/your/codebase"
-    }
-  }
-}
-```
-
-**Or using Python directly**:
-```json
-{
-  "mcpServers": {
-    "codeminder": {
-      "command": "/path/to/codeminder/.venv/bin/python",
-      "args": ["-m", "codeminder.mcp_server"],
+      "command": "python",
+      "args": ["-m", "codeminder.server"],
       "workingDirectory": "/path/to/your/codebase"
     }
   }
@@ -143,26 +125,11 @@ Restart Claude Desktop to load the configuration.
 
 ## Basic Usage
 
-### 1. Automatic Indexing
+### 1. Index Your Codebase
 
-CodeMinder automatically indexes your codebase on startup:
+**First Run**: Server automatically performs startup reconciliation and indexes all files.
 
-**First Run**:
-- Downloads embedding model (~1GB, cached to `~/.cache/huggingface/`) - one-time download
-- Scans codebase for Python files (.py)
-- Parses each file into AST (Abstract Syntax Tree)
-- Chunks code at logical boundaries (functions, classes, methods)
-- Generates embeddings locally using sentence-transformers
-- **Persists File registry to LanceDB** - tracks which files are indexed and when
-- Stores code chunks + embeddings in LanceDB (`.codeminder/vector_db/`)
-
-**Subsequent Runs**:
-- Loads File registry from LanceDB
-- Compares filesystem mtime vs `last_indexed` timestamp for each file
-- **Only re-indexes files that changed while server was down**
-- Deletes records for files that were removed
-- Adds new files discovered on filesystem
-- Much faster than full re-index (typically 2-5 seconds for small changes)
+**Subsequent Runs**: Server loads existing file registry and only re-indexes changed files.
 
 **Manual Re-index** (optional, for debugging):
 
@@ -182,6 +149,24 @@ Use the index_codebase tool to force a full re-index of my codebase.
   }
 }
 ```
+
+**What happens on first run**:
+- Downloads embedding model on first run (~1GB, cached to `~/.cache/huggingface/`)
+- Scans codebase for Python files (.py)
+- Parses each file into AST (Abstract Syntax Tree)
+- Chunks code at logical boundaries (functions, classes, methods)
+- Generates embeddings locally using sentence-transformers
+- **Persists File registry to LanceDB** (tracks which files indexed and when)
+- Stores code chunks + embeddings in LanceDB (`.codeminder/vector_db/`)
+- Starts file watcher for automatic updates
+
+**What happens on subsequent startups**:
+- Loads File registry from LanceDB
+- Compares filesystem mtime vs `last_indexed` for each file
+- **Only re-indexes files that changed while server was down**
+- Deletes records for files that were removed
+- Adds new files discovered on filesystem
+- Much faster than full re-index (typically 2-5 seconds for small changes)
 
 ### 2. Search for Code
 
@@ -222,36 +207,18 @@ I found 3 relevant code snippets:
 [Additional results...]
 ```
 
-### 3. Check Index Status
+### 3. Automatic Re-Indexing
 
-**In Claude/AI Assistant**:
-```
-Get the current index status
-```
+CodeMinder automatically detects file changes and updates the index.
 
-**Response**:
-```json
-{
-  "status": "ready",
-  "statistics": {
-    "files_indexed": 142,
-    "total_chunks": 3891,
-    "index_size_mb": 245.3,
-    "last_indexed": "2025-12-09T10:30:45Z"
-  },
-  "registry": {
-    "persisted": true,
-    "files_in_registry": 142
-  },
-  "reconciliation": {
-    "actions_on_startup": {
-      "new_files": 0,
-      "modified_files": 2,
-      "deleted_files": 0
-    }
-  }
-}
-```
+**What happens when you save a file**:
+1. File watcher detects change (debounced 500ms)
+2. Old chunks deleted from index
+3. File re-parsed and re-indexed
+4. New embeddings generated and stored
+5. Search immediately reflects updated code
+
+**No manual intervention needed!**
 
 ---
 
@@ -272,13 +239,13 @@ cat > .codeminder.json << 'EOF'
 }
 EOF
 
-# 3. Configure MCP client (e.g., Claude Desktop)
-# Server will automatically index on first startup
+# 3. Start MCP server (or via IDE integration)
+python -m codeminder.server
 ```
 
 **In AI Assistant**:
 ```
-Explain the architecture of this codebase
+Index this codebase, then explain the architecture
 ```
 
 ### Workflow 2: Finding Implementation Examples
@@ -307,7 +274,32 @@ Find all places where user input is processed without validation
 
 ---
 
-## Troubleshooting
+## Verification & Troubleshooting
+
+### Check Index Status
+
+```python
+# Optional: get_index_status tool (if implemented)
+# In AI assistant:
+Get the current index status
+```
+
+**Response**:
+```json
+{
+  "status": "ready",
+  "statistics": {
+    "files_indexed": 142,
+    "total_chunks": 3891,
+    "total_lines_of_code": 45230,
+    "index_size_mb": 87.3
+  },
+  "file_watcher": {
+    "enabled": true,
+    "watching_path": "/home/user/project"
+  }
+}
+```
 
 ### Common Issues
 
@@ -318,8 +310,7 @@ Find all places where user input is processed without validation
 **Solutions**:
 - Check `.codeminder.json` syntax (valid JSON)
 - Ensure `codebase_path` exists and is readable
-- Verify Python 3.12+ is installed
-- Check that embedding model can be downloaded from HuggingFace
+- Verify `JINA_API_KEY` environment variable is set
 
 #### Issue: "No results found"
 
@@ -340,14 +331,14 @@ Find all places where user input is processed without validation
 - Run with appropriate user permissions
 - Ensure disk space available
 
-#### Issue: "Index not updating after code changes"
+#### Issue: "File watcher not detecting changes"
 
-**Symptom**: Code changes not reflected in search results
+**Symptom**: Code changes not reflected in search
 
 **Solutions**:
-- **Restart the MCP server** to trigger startup reconciliation (automatically detects and re-indexes changed files)
-- Or manually run `index_codebase` tool again to force full re-index
-- Note: Startup reconciliation compares file modification times and only re-indexes what changed
+- Check file watcher logs (`.codeminder/codeminder.log`)
+- Verify file is in `codebase_path` (not in `excluded_patterns`)
+- Restart server to reset watcher
 
 ### Logs
 
@@ -398,8 +389,6 @@ grep "src/auth.py" .codeminder/codeminder.log
 }
 ```
 
-**Note**: Pattern-based file exclusion is planned for a future release. Currently, the scanner includes all `.py` files in the codebase path.
-
 ### For Faster Indexing
 
 **Reduce Token Limit** (smaller chunks, faster processing):
@@ -434,29 +423,21 @@ grep "src/auth.py" .codeminder/codeminder.log
 
 ---
 
-## Current Features & Roadmap
+## Next Steps
 
-### ✅ Implemented (User Story 1)
+### Phase 1 (Current)
 
-- Python code indexing with AST-based chunking
-- Semantic search via MCP tools
-- Startup reconciliation (automatic detection of changed files)
-- Persistent file registry in LanceDB
-- Local embeddings (privacy-preserving)
-- MCP server with `index_codebase` and `search_code` tools
+- ✅ Python code indexing
+- ✅ Semantic search
+- ✅ Automatic re-indexing
+- ✅ MCP server
 
-### 🚧 Planned Features
+### Phase 2 (Future)
 
-**User Story 2: Automatic Index Maintenance**
-- Real-time file watching with automatic re-indexing
-- Live updates as you save files (no server restart needed)
-- Debounced change detection (500ms)
-
-**Future Phases**
-- Multi-language support (JavaScript, TypeScript, Java, etc.)
-- Code graph overlay (imports, function calls, dependencies)
-- Hybrid retrieval (vector + graph traversal)
-- Advanced filtering and search refinements
+- Multi-language support (JavaScript, TypeScript)
+- Code graph overlay (imports, function calls)
+- Hybrid retrieval (vector + graph)
+- Performance optimizations
 
 ### Advanced Usage
 
@@ -466,41 +447,25 @@ grep "src/auth.py" .codeminder/codeminder.log
 
 ---
 
-## Architecture
-
-For detailed information about the system design, AST chunking algorithm, and technical decisions, see:
-- **Architecture Overview**: [docs/architecture.md](docs/architecture.md)
-- **Configuration Reference**: [docs/configuration.md](docs/configuration.md)
-- **Full Specification**: [specs/001-code-rag-mcp/](specs/001-code-rag-mcp/)
-
----
-
 ## Support & Resources
 
-- **Documentation**: [specs/001-code-rag-mcp/](specs/001-code-rag-mcp/)
-- **Issues**: https://github.com/vamsi10010/codeminder/issues
+- **Documentation**: `/specs/001-code-rag-mcp/`
+- **Issues**: https://github.com/your-org/codeminder/issues
 - **MCP Protocol**: https://modelcontextprotocol.io/
 - **HuggingFace Models**: https://huggingface.co/models?pipeline_tag=sentence-similarity
 
 ---
 
-## Quick Start Summary
+## Summary
 
 **3 Steps to Get Started**:
-1. **Install**: `uv sync` (creates venv and installs dependencies)
-2. **Configure**: Create `.codeminder.json` in your codebase root
-3. **Connect**: Add to Claude Desktop or MCP-compatible AI assistant
+1. Install dependencies: `uv pip install -e .`
+2. Configure: Create `.codeminder.json` with embedding model preference
+3. Run: `python -m codeminder.server` and connect AI assistant
 
-**Key Features**:
-- 🔍 Semantic code search via natural language queries
-- 🌳 AST-based chunking ensures syntactic validity
-- 🔒 100% local processing - your code never leaves your machine
-- 💾 Persistent index with automatic startup reconciliation
-- 🚀 Fast search: <1s for 100k LOC codebases
-
-**Available MCP Tools**:
-- `index_codebase`: Manually trigger full re-index
-- `search_code`: Semantic search for code snippets
-- `get_index_status`: Check indexing statistics and status
+**Key Commands**:
+- Index codebase: `index_codebase` MCP tool
+- Search code: Natural language queries via AI assistant
+- Check logs: `tail -f .codeminder/codeminder.log`
 
 CodeMinder is now ready to help you navigate and understand your codebase!

@@ -1,0 +1,11 @@
+{
+  "codebase_path": ".",
+  "chunking_strategy": "ast",
+  "embedding_model": "jinaai/jina-embeddings-v2-base-code",
+  "token_limit": 2048,
+  "max_search_results": 20,
+  "concurrency_limit": 4,
+  "debounce_ms": 500,
+  "log_level": "INFO",
+  "persist_index": true
+}
