@@ -304,7 +304,6 @@ class IndexingService:
         relative_path = self.scanner.get_relative_path(file_path)
         logger.debug(f"Indexing file: {relative_path}")
 
-        # Create new file object
         file = File(
             absolute_path=str(file_path),
             relative_path=relative_path,

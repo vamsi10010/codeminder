@@ -67,7 +67,7 @@ class Embedder:
     def encode(
         self,
         texts: list[str],
-        batch_size: int = 32,
+        batch_size: int = 4,
         show_progress: bool = False,
         max_retries: int = 3,
     ) -> list[list[float]]:
