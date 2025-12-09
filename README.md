@@ -20,10 +20,11 @@ Codeminder is an MCP server that enables RAG for code repositories.
 git clone https://github.com/your-org/codeminder.git
 cd codeminder
 
-# Install dependencies using uv
-uv venv
+# Install dependencies using uv (automatically creates venv and installs deps)
+uv sync
+
+# Activate the virtual environment
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -e .
 ```
 
 ### 2. Create Configuration File
@@ -38,32 +39,21 @@ Create `.codeminder.json` in your codebase root:
   "max_search_results": 20,
   "concurrency_limit": 4,
   "debounce_ms": 500,
-  "log_level": "INFO",
-  "persist_index": true,
-  "excluded_patterns": [
-    "*.pyc",
-    "__pycache__",
-    ".git",
-    ".venv",
-    "node_modules",
-    "*.min.js"
-  ]
+  "persist_index": true
 }
 ```
 
 **Configuration Options**:
-- `codebase_path`: Directory to index (relative or absolute path)
+- `codebase_path`: Directory to index (relative or absolute path, required)
 - `embedding_model`: HuggingFace model ID (default: jinaai/jina-embeddings-v2-base-code)
   - Lightweight: `microsoft/codebert-base` (~500MB)
   - Budget: `sentence-transformers/all-MiniLM-L6-v2` (~80MB)
-- `token_limit`: Max tokens per code chunk (default: 2048)
-- `max_search_results`: Number of search results to return (default: 20)
+- `token_limit`: Max tokens per code chunk (512-8192, default: 2048)
+- `max_search_results`: Number of search results to return (1-100, default: 20)
 - `concurrency_limit`: Parallel file processing (1-16, default: 4)
 - `debounce_ms`: File change debounce delay (default: 500ms)
 - `log_level`: DEBUG | INFO | WARN | ERROR
 - `persist_index`: Save index to disk for restart persistence
-- `excluded_patterns`: Glob patterns to skip during indexing
-
 ---
 
 ## Running the MCP Server
@@ -71,20 +61,22 @@ Create `.codeminder.json` in your codebase root:
 ### Start Server
 
 ```bash
-# Start CodeMinder MCP server
-python -m codeminder.server
+# Start CodeMinder MCP server (uses entry point from pyproject.toml)
+codeminder
 
-# Or with custom config location
-python -m codeminder.server --config /path/to/.codeminder.json
+# Or directly with Python
+python -m codeminder.mcp_server
 ```
 
 **Output**:
 ```
 [INFO] CodeMinder MCP Server v0.1.0
 [INFO] Configuration loaded from .codeminder.json
-[INFO] File watcher started: /home/user/project
+[INFO] Connected to LanceDB at .codeminder/vector_db
 [INFO] MCP server listening on stdio
 ```
+
+**Note**: The server runs in the foreground and communicates via stdio (standard input/output) using the Model Context Protocol. It's designed to be started by MCP clients (like Claude Desktop), not run directly by users.
 
 ### Connect AI Assistant
 
@@ -101,8 +93,20 @@ Edit `~/.config/claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "codeminder": {
-      "command": "python",
-      "args": ["-m", "codeminder.server"],
+      "command": "/path/to/codeminder/.venv/bin/codeminder",
+      "workingDirectory": "/path/to/your/codebase"
+    }
+  }
+}
+```
+
+**Or using Python directly**:
+```json
+{
+  "mcpServers": {
+    "codeminder": {
+      "command": "/path/to/codeminder/.venv/bin/python",
+      "args": ["-m", "codeminder.mcp_server"],
       "workingDirectory": "/path/to/your/codebase"
     }
   }
@@ -137,13 +141,13 @@ Use the index_codebase tool to index my codebase.
 ```
 
 **What happens**:
-- Downloads embedding model on first run (~1GB, cached to `~/.cache/huggingface/`)
 - Scans codebase for Python files (.py)
 - Parses each file into AST (Abstract Syntax Tree)
 - Chunks code at logical boundaries (functions, classes, methods)
 - Generates embeddings locally using sentence-transformers
 - Stores in LanceDB (`.codeminder/vector_db/`)
-- Starts file watcher for automatic updates
+
+**Note**: The embedding model (~1GB) is downloaded on first initialization when the MCP server starts, cached to `~/.cache/huggingface/`. This is a one-time download.
 
 ### 2. Search for Code
 
@@ -184,18 +188,13 @@ I found 3 relevant code snippets:
 [Additional results...]
 ```
 
-### 3. Automatic Re-Indexing
+### 3. Re-Indexing on Changes
 
-CodeMinder automatically detects file changes and updates the index.
+**Current Implementation (User Story 1)**:
+CodeMinder performs **startup reconciliation** - it compares the persisted file registry with the current filesystem state and automatically re-indexes any modified or new files when the server starts.
 
-**What happens when you save a file**:
-1. File watcher detects change (debounced 500ms)
-2. Old chunks deleted from index
-3. File re-parsed and re-indexed
-4. New embeddings generated and stored
-5. Search immediately reflects updated code
-
-**No manual intervention needed!**
+**Coming Soon (User Story 2)**:
+Automatic file watching for real-time re-indexing will detect changes as you save files without requiring server restart.
 
 ---
 
@@ -268,12 +267,13 @@ Get the current index status
   "statistics": {
     "files_indexed": 142,
     "total_chunks": 3891,
-    "total_lines_of_code": 45230,
-    "index_size_mb": 87.3
+    "total_lines_of_code": 0,
+    "index_size_mb": 0.0,
+    "last_indexed": "2025-12-09T..."
   },
-  "file_watcher": {
-    "enabled": true,
-    "watching_path": "/home/user/project"
+  "registry": {
+    "persisted": true,
+    "files_in_registry": 142
   }
 }
 ```
@@ -287,7 +287,8 @@ Get the current index status
 **Solutions**:
 - Check `.codeminder.json` syntax (valid JSON)
 - Ensure `codebase_path` exists and is readable
-- Verify `JINA_API_KEY` environment variable is set
+- Verify Python 3.12+ is installed
+- Check that embedding model can be downloaded from HuggingFace
 
 #### Issue: "No results found"
 
@@ -308,14 +309,14 @@ Get the current index status
 - Run with appropriate user permissions
 - Ensure disk space available
 
-#### Issue: "File watcher not detecting changes"
+#### Issue: "Index not updating after code changes"
 
 **Symptom**: Code changes not reflected in search
 
 **Solutions**:
-- Check file watcher logs (`.codeminder/codeminder.log`)
-- Verify file is in `codebase_path` (not in `excluded_patterns`)
-- Restart server to reset watcher
+- Currently requires server restart to trigger startup reconciliation
+- Or manually run `index_codebase` tool again
+- Automatic file watching (User Story 2) is planned for future release
 
 ### Logs
 
@@ -366,12 +367,7 @@ grep "src/auth.py" .codeminder/codeminder.log
 }
 ```
 
-**Exclude Test Files**:
-```json
-{
-  "excluded_patterns": ["test_*.py", "*_test.py", "tests/"]
-}
-```
+**Note**: Pattern-based file exclusion is planned for a future release. Currently, the scanner includes all `.py` files in the codebase path.
 
 ### For Faster Indexing
 

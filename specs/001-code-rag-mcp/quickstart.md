@@ -24,10 +24,11 @@ Get CodeMinder up and running in under 5 minutes.
 git clone https://github.com/your-org/codeminder.git
 cd codeminder
 
-# Install dependencies using uv
-uv venv
+# Install dependencies using uv (automatically creates venv and installs deps)
+uv sync
+
+# Activate the virtual environment
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -e .
 ```
 
 ### 2. Create Configuration File
@@ -43,31 +44,21 @@ Create `.codeminder.json` in your codebase root:
   "concurrency_limit": 4,
   "debounce_ms": 500,
   "log_level": "INFO",
-  "persist_index": true,
-  "excluded_patterns": [
-    "*.pyc",
-    "__pycache__",
-    ".git",
-    ".venv",
-    "node_modules",
-    "*.min.js"
-  ]
+  "persist_index": true
 }
 ```
 
 **Configuration Options**:
-- `codebase_path`: Directory to index (relative or absolute path)
+- `codebase_path`: Directory to index (relative or absolute path, required)
 - `embedding_model`: HuggingFace model ID (default: jinaai/jina-embeddings-v2-base-code)
   - Lightweight: `microsoft/codebert-base` (~500MB)
   - Budget: `sentence-transformers/all-MiniLM-L6-v2` (~80MB)
-- `token_limit`: Max tokens per code chunk (default: 2048)
-- `max_search_results`: Number of search results to return (default: 20)
+- `token_limit`: Max tokens per code chunk (512-8192, default: 2048)
+- `max_search_results`: Number of search results to return (1-100, default: 20)
 - `concurrency_limit`: Parallel file processing (1-16, default: 4)
 - `debounce_ms`: File change debounce delay (default: 500ms)
 - `log_level`: DEBUG | INFO | WARN | ERROR
 - `persist_index`: Save index to disk for restart persistence
-- `excluded_patterns`: Glob patterns to skip during indexing
-
 ---
 
 ## Running the MCP Server
@@ -75,11 +66,11 @@ Create `.codeminder.json` in your codebase root:
 ### Start Server
 
 ```bash
-# Start CodeMinder MCP server
-python -m codeminder.server
+# Start CodeMinder MCP server (uses entry point from pyproject.toml)
+codeminder
 
-# Or with custom config location
-python -m codeminder.server --config /path/to/.codeminder.json
+# Or directly with Python
+python -m codeminder.mcp_server
 ```
 
 **Output** (first run):
@@ -88,7 +79,6 @@ python -m codeminder.server --config /path/to/.codeminder.json
 [INFO] Configuration loaded from .codeminder.json
 [INFO] Connected to LanceDB at .codeminder/vector_db
 [INFO] No existing file registry found, will index from scratch
-[INFO] File watcher started: /home/user/project
 [INFO] MCP server listening on stdio
 ```
 
@@ -98,6 +88,7 @@ python -m codeminder.server --config /path/to/.codeminder.json
 [INFO] Configuration loaded from .codeminder.json
 [INFO] Connected to LanceDB at .codeminder/vector_db
 [INFO] Loaded file registry with 142 files
+[INFO] Reconciliation actions: 0 new, 2 modified, 0 deleted
 [INFO] Startup reconciliation: 3 files modified, 1 deleted, 0 new
 [INFO] Re-indexing 3 modified files...
 [INFO] Reconciliation complete in 4.2 seconds

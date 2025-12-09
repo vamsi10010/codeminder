@@ -1,8 +1,7 @@
 import json
 from pathlib import Path
 
-from pydantic import BaseModel, Field, field_validator, model_validator
-from sentence_transformers import SentenceTransformer
+from pydantic import BaseModel, Field, field_validator
 
 
 class Configuration(BaseModel):
@@ -11,7 +10,9 @@ class Configuration(BaseModel):
         default="jinaai/jina-embeddings-v2-base-code",
         description="sentence-transformers model name",
     )
-    token_limit: int = Field(default=2048, ge=1, le=8192, description="Maximum tokens per chunk")
+    token_limit: int = Field(
+        default=2048, ge=1, le=8192, description="Maximum tokens per chunk"
+    )
     max_search_results: int = Field(
         default=20,
         ge=1,
@@ -20,12 +21,6 @@ class Configuration(BaseModel):
     )
     concurrency_limit: int = Field(
         default=4, ge=1, le=16, description="Number of files to process in parallel"
-    )
-    debounce_ms: int = Field(
-        default=500,
-        ge=100,
-        le=5000,
-        description="File watcher debounce delay in milliseconds",
     )
     log_level: str = Field(
         default="INFO",
@@ -54,17 +49,19 @@ class Configuration(BaseModel):
             raise ValueError(f"Invalid log level: {v}. Must be one of {valid_levels}")
         return upper_v
 
-    @model_validator(mode="after")
-    def validate_token_limit(self) -> "Configuration":
-        model = SentenceTransformer(self.embedding_model, trust_remote_code=True)
-        max_length = model.get_max_seq_length()
-        if max_length is None:
-            raise ValueError("Could not determine model's maximum sequence length")
-        elif self.token_limit > max_length:
-            raise ValueError(
-                f"Token limit {self.token_limit} exceeds model's maximum sequence length of {max_length}"
-            )
-        return self
+    @field_validator("token_limit")
+    @classmethod
+    def validate_token_limit_range(cls, v: int) -> int:
+        """Validate token limit is in reasonable range.
+
+        Note: Actual model max_seq_length validation happens when embedder loads the model,
+        as we don't want to download the model during config validation.
+        """
+        if v < 512:
+            raise ValueError("Token limit must be at least 512")
+        if v > 8192:
+            raise ValueError("Token limit cannot exceed 8192")
+        return v
 
     @classmethod
     def load_from_file(cls, config_path: str = ".codeminder.json") -> "Configuration":

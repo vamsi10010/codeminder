@@ -25,7 +25,7 @@ class FileScanner:
                 ignore_file = self.codebase_path / ignore_file_name
                 if ignore_file.exists():
                     try:
-                        with open(ignore_file, "r", encoding="utf-8") as f:
+                        with open(ignore_file, encoding="utf-8") as f:
                             for line in f:
                                 line = line.strip()
                                 if line and not line.startswith("#"):

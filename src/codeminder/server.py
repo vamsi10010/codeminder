@@ -93,7 +93,7 @@ class IndexingService:
         self.vector_db.create_table()
         self.vector_db.create_file_registry_table()
 
-        self.embedder.load_model()
+        self.embedder.load_model(token_limit=self.config.token_limit)
 
         await self._reconcile_index()
 
@@ -404,7 +404,9 @@ class IndexingService:
             file.chunk_count = len(chunks)
             self.vector_db.upsert_file(file)
 
-            logger.info(f"Successfully re-indexed {file.relative_path}: {len(chunks)} chunks")
+            logger.info(
+                f"Successfully re-indexed {file.relative_path}: {len(chunks)} chunks"
+            )
             return file
 
         except Exception as e:

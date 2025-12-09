@@ -1,13 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "codeminder"
 version = "0.1.0"
-description = "Add your description here"
+description = "MCP server for semantic code search using RAG"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastmcp>=2.13.3",
     "lancedb>=0.25.3",
-    "optimum>=2.0.0",
     "pandas>=2.3.3",
     "pydantic>=2.12.5",
     "sentence-transformers>=5.1.2",

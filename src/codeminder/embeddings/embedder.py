@@ -32,12 +32,31 @@ class Embedder:
             logger.info("Using CPU for embeddings")
         return device
 
-    def load_model(self) -> None:
+    def load_model(self, token_limit: int | None = None) -> None:
+        """Load the embedding model and optionally validate token limit.
+
+        Args:
+            token_limit: Optional token limit to validate against model's max_seq_length.
+                        If provided, will raise error if limit exceeds model capacity.
+
+        Raises:
+            EmbeddingError: If model fails to load or token limit is invalid.
+        """
         try:
             logger.info(f"Loading embedding model: {self.model_name}")
             self._model = SentenceTransformer(
                 self.model_name, device=self.device, trust_remote_code=True
             )
+
+            # Validate token limit if provided
+            if token_limit is not None:
+                max_length = self._model.get_max_seq_length()
+                if max_length and token_limit > max_length:
+                    raise ValueError(
+                        f"Token limit {token_limit} exceeds model's maximum sequence "
+                        f"length of {max_length}"
+                    )
+
             logger.info(f"Model loaded successfully on {self.device}")
         except Exception as e:
             raise EmbeddingError(

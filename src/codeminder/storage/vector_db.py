@@ -5,7 +5,6 @@ from typing import Any
 from uuid import UUID
 
 import lancedb
-import pyarrow as pa
 from lancedb import DBConnection
 from lancedb.table import Table
 
@@ -41,9 +40,7 @@ class VectorDB:
                 f"Failed to connect to database: {str(e)}", {"db_path": self.db_path}
             ) from e
 
-    def create_table(
-        self, table_name: str = "code_chunks", schema: pa.Schema | None = None
-    ) -> None:
+    def create_table(self, table_name: str = "code_chunks") -> None:
         """Open existing table or prepare for creation on first insert.
 
         LanceDB cannot create tables from empty data, so we defer table creation
