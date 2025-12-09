@@ -44,7 +44,7 @@ async def index_codebase() -> dict[str, Any]:
 
     Scans the codebase directory, parses code files, generates embeddings,
     and stores chunks in the vector database. On subsequent runs, performs
-    startup reconciliation to re-index only modified files.
+    reindexing of only changed files and removes deleted files from the index.
 
     Returns:
         Dictionary with indexing summary including file counts, chunk counts,

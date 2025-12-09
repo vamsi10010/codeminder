@@ -113,7 +113,7 @@
 
 ---
 
-## Phase 4: User Story 2 - Automatic Index Maintenance (Priority: P1)
+## Phase 4: User Story 2 - Automatic Index Maintenance (Priority: P2)
 
 **Goal**: Automatically detect file changes and update the index in real-time without manual intervention (see spec.md User Story 2 for acceptance criteria)
 
@@ -153,9 +153,9 @@
 
 ### Documentation
 
-- [ ] T061 [P] Update README.md with installation instructions from quickstart.md
-- [ ] T062 [P] Create docs/architecture.md explaining AST chunking algorithm and system design
-- [ ] T063 [P] Create docs/configuration.md documenting all .codeminder.json options
+- [X] T061 [P] Update README.md with installation instructions from quickstart.md
+- [X] T062 [P] Create docs/architecture.md explaining AST chunking algorithm and system design
+- [X] T063 [P] Create docs/configuration.md documenting all .codeminder.json options
 
 ### Code Quality
 
@@ -193,7 +193,7 @@
 
 - **User Story 1 (P1)**: Must complete first - provides core indexing and search
   - Foundational phase → AST Parsing → Embedding → Storage → Search → Indexing → MCP Tools
-- **User Story 2 (P1)**: Depends on User Story 1 completion
+- **User Story 2 (P2)**: Depends on User Story 1 completion
   - User Story 1 → File Watcher → Re-indexing → Integration
 
 ### Within Each User Story
