@@ -1,4 +1,4 @@
-"""FastMCP Server for CodeMinder - MCP tool implementations."""
+"""FastMCP server for CodeMinder - MCP tool implementations."""
 
 from typing import Any
 
@@ -19,9 +19,12 @@ _indexing_service: IndexingService | None = None
 _searcher: Searcher | None = None
 
 
-async def initialize_server() -> None:
-    """Initialize the MCP server and all components."""
+async def _ensure_initialized() -> None:
+    """Ensure services are initialized before handling requests."""
     global _indexing_service, _searcher
+
+    if _indexing_service is not None and _searcher is not None:
+        return
 
     logger.info("Starting CodeMinder MCP server initialization...")
 
@@ -52,6 +55,8 @@ async def index_codebase() -> dict[str, Any]:
     Raises:
         Exception: If indexing service not initialized or indexing fails.
     """
+    await _ensure_initialized()
+
     if not _indexing_service:
         raise Exception("Indexing service not initialized. Server startup failed.")
 
@@ -87,6 +92,8 @@ async def search_code(query: str, limit: int = 10) -> dict[str, Any]:
     Raises:
         Exception: If search service not initialized or search fails.
     """
+    await _ensure_initialized()
+
     if not _searcher:
         raise Exception("Search service not initialized. Server startup failed.")
 
@@ -148,6 +155,8 @@ async def get_index_status() -> dict[str, Any]:
     Raises:
         Exception: If indexing service not initialized.
     """
+    await _ensure_initialized()
+
     if not _indexing_service:
         return {
             "status": "not_ready",
@@ -204,10 +213,7 @@ async def get_index_status() -> dict[str, Any]:
 
 def main() -> None:
     """Main entry point for the MCP server."""
-    import asyncio
-
-    asyncio.run(initialize_server())
-    mcp.run()
+    mcp.run(transport="stdio")
 
 
 if __name__ == "__main__":
