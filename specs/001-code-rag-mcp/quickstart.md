@@ -370,13 +370,6 @@ grep "src/auth.py" .codeminder/codeminder.log
 }
 ```
 
-**Exclude Test Files**:
-```json
-{
-  "excluded_patterns": ["test_*.py", "*_test.py", "tests/"]
-}
-```
-
 ### For Faster Indexing
 
 **Reduce Token Limit** (smaller chunks, faster processing):

@@ -20,15 +20,13 @@
 - Q: Handling Rapid Successive File Changes - What should happen if the same file is modified multiple times in quick succession? → A: Debounce with delay (wait 500ms for changes to settle)
 - Q: Batch Update Handling (Git Operations) - What should happen when many files change simultaneously? → A: Parallel processing with configurable concurrency limit (from 1 to X files at once)
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios *(mandatory)*
 
 ### User Story 1 - Semantic Code Search via MCP (Priority: P1)
 
 An AI coding assistant (like Claude or Gemini) needs to find relevant code in a large codebase to answer a developer's question or implement a feature. The assistant invokes the CodeMinder MCP tool with a natural language query like "Find the authentication logic" and receives complete, executable code units with proper context.
 
 **Why this priority**: This is the core value proposition - enabling AI assistants to intelligently retrieve code. Without this, CodeMinder has no purpose. This delivers immediate value as a working semantic search tool.
-
-**Independent Test**: Can be fully tested by starting the MCP server, connecting an AI assistant, asking it to search for specific functionality (e.g., "database connection logic"), and verifying it returns syntactically complete code units with file paths and line numbers.
 
 **Acceptance Scenarios**:
 
@@ -46,8 +44,6 @@ A developer is actively coding and saves changes to files. CodeMinder automatica
 
 **Why this priority**: Real-time sync ensures the AI always works with current code, preventing bugs from stale information. This is essential for Phase 1 MVP to provide a seamless development experience without manual re-indexing.
 
-**Independent Test**: Can be fully tested by starting the file watcher, modifying and saving a file, then querying for content from that file to verify the updated version is returned.
-
 **Acceptance Scenarios**:
 
 1. **Given** the file watcher is running, **When** a developer saves changes to a Python file, **Then** the system deletes all old chunks for that file and re-parses the entire file within 2 seconds
@@ -64,8 +60,6 @@ A developer is actively coding and saves changes to files. CodeMinder automatica
 A codebase contains multiple programming languages (Python, JavaScript, TypeScript). CodeMinder can parse and index all supported languages, allowing AI assistants to search across the entire codebase regardless of language.
 
 **Why this priority**: Most real-world projects are polyglot. This is deferred to Phase 2 to keep Phase 1 focused on Python-only, but remains important for broader adoption.
-
-**Independent Test**: Can be fully tested by creating a multi-language repository, indexing it, and verifying queries return relevant results from different language files with appropriate AST parsing for each language.
 
 **Acceptance Scenarios**:
 
@@ -210,7 +204,7 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 - Code editing or modification capabilities (read-only system)
 - Authentication or multi-user access control
 - Remote/cloud deployment or API hosting
-- Code execution or testing functionality
+- Code execution functionality
 - Integration with specific IDEs (MCP handles this)
 - Version control integration (git blame, history)
 
@@ -223,7 +217,6 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 - FastMCP (MCP server framework with decorator-based tool registration)
 - Watchfiles (Rust-based file watching library with built-in debouncing)
 - tiktoken (token counting for adaptive chunking algorithm)
-- pytest (testing framework with >80% coverage target)
 - ruff (linting and formatting)
 - mypy (type checking with strict mode)
 - uv (package management and virtual environments)

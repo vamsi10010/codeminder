@@ -141,7 +141,7 @@ Searches the indexed codebase for code snippets matching a natural language quer
         "relative_path": "src/auth/jwt_handler.py"
       },
       "chunk": {
-        "context_path": "File: src/auth/jwt_handler.py > Class: JWTHandler > Method: verify_token",
+        "context_path": "src/auth/jwt_handler.py:42-50",
         "code": "def verify_token(self, token: str) -> dict:\n    \"\"\"Verify JWT token and return payload.\"\"\"\n    try:\n        payload = jwt.decode(token, self.secret_key, algorithms=['HS256'])\n        return payload\n    except jwt.ExpiredSignatureError:\n        raise AuthenticationError('Token has expired')\n    except jwt.InvalidTokenError:\n        raise AuthenticationError('Invalid token')",
         "start_line": 42,
         "end_line": 50,
@@ -156,7 +156,7 @@ Searches the indexed codebase for code snippets matching a natural language quer
         "relative_path": "src/auth/middleware.py"
       },
       "chunk": {
-        "context_path": "File: src/auth/middleware.py > Function: authenticate_request",
+        "context_path": "src/auth/middleware.py:15-24",
         "code": "def authenticate_request(request: Request) -> User:\n    \"\"\"Extract and verify JWT from request headers.\"\"\"\n    token = request.headers.get('Authorization')\n    if not token or not token.startswith('Bearer '):\n        raise AuthenticationError('Missing or invalid Authorization header')\n    token = token[7:]  # Remove 'Bearer ' prefix\n    handler = JWTHandler()\n    payload = handler.verify_token(token)\n    return User.from_payload(payload)",
         "start_line": 15,
         "end_line": 24,
@@ -291,33 +291,6 @@ Returns current indexing status and statistics.
 | `EMBEDDING_ERROR` | Failed to generate embeddings | API key invalid, network issue | Check JINA_API_KEY, network |
 | `WATCHER_ERROR` | File watcher failed | Permission issues | Check codebase directory permissions |
 | `INVALID_QUERY` | Search query invalid | Empty query string | Provide non-empty query |
-
----
-
-## Contract Testing Strategy
-
-### Test Cases for `index_codebase`
-
-1. **Happy path**: Valid codebase → Returns summary with correct counts
-2. **Empty directory**: No code files → Returns 0 files_indexed
-3. **Syntax errors**: Some files have errors → partial_success with error details
-4. **Missing config**: No .codeminder.json → CONFIG_ERROR
-5. **Permission denied**: Cannot read codebase → CONFIG_ERROR with context
-
-### Test Cases for `search_code`
-
-1. **Happy path**: Query matches code → Returns ranked results with similarity scores
-2. **No matches**: Query doesn't match → Empty results array
-3. **Not indexed**: Database empty → INDEX_NOT_READY error
-4. **Invalid limit**: limit=0 or limit>100 → Validation error
-5. **Empty query**: query="" → INVALID_QUERY error
-6. **During re-index**: Search while file updating → Waits for atomic completion
-
-### Test Cases for Error Handling
-
-1. **Structured errors**: All errors include code, message, context, recovery
-2. **Context preservation**: Error context includes relevant details (file path, line number)
-3. **Actionable messages**: Recovery field tells user exactly what to do
 
 ---
 

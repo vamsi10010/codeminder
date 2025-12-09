@@ -46,9 +46,8 @@ class CodeChunk:
     end_line: int = 0
     token_count: int = 0
     node_type: str = ""
-    sequence_number: int = 0
     language: str = ""
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=datetime.now)
 
     def to_dict(self) -> dict:
         return {
@@ -60,7 +59,6 @@ class CodeChunk:
             "end_line": self.end_line,
             "token_count": self.token_count,
             "node_type": self.node_type,
-            "sequence_number": self.sequence_number,
             "language": self.language,
             "created_at": self.created_at.isoformat(),
         }

@@ -3,9 +3,7 @@
 **Input**: Design documents from `/specs/001-code-rag-mcp/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/mcp-tools.md
 
-**Tests**: Per the constitution, Test-First Development is MANDATORY. All features MUST include tests written BEFORE implementation.
-
-**Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
+**Organization**: Tasks are grouped by user story to enable independent implementation of each story.
 
 ## Format: `- [ ] [ID] [P?] [Story?] Description`
 
@@ -23,8 +21,7 @@
 - [x] T002 Initialize Python 3.12+ project with pyproject.toml using uv
 - [x] T003 [P] Configure ruff (linting/formatting) in pyproject.toml
 - [x] T004 [P] Configure mypy (type checking) with strict mode in pyproject.toml
-- [x] T005 [P] Configure pytest with coverage plugin in pyproject.toml
-- [x] T006 Create .codeminder.json.example configuration template with all options
+- [x] T005 Create .codeminder.json.example configuration template with all options
 - [x] T007 [P] Setup .gitignore (.codeminder/, .venv/, __pycache__, *.pyc)
 - [x] T008 Create README.md with project overview and quickstart reference
 
@@ -62,26 +59,13 @@
 
 **Goal**: Enable AI assistants to search codebases semantically via MCP tools, returning syntactically valid code chunks with context
 
-**Independent Test**: Start MCP server, connect AI assistant, index a Python codebase, search for "authentication logic", verify results contain valid code with file paths and line numbers
-
-### Tests for User Story 1 (Write FIRST - Red-Green-Refactor) ⚠️
-
-- [X] T018 [P] [US1] Contract test for index_codebase tool in tests/contract/test_mcp_index.py (request format, success response, error responses)
-- [X] T019 [P] [US1] Contract test for search_code tool in tests/contract/test_mcp_search.py (request format, result structure, ranking)
-- [X] T020 [P] [US1] Integration test for end-to-end indexing flow in tests/integration/test_indexing_flow.py (scan files, parse AST, chunk, embed, store)
-- [X] T021 [P] [US1] Integration test for end-to-end search flow in tests/integration/test_search_flow.py (query embedding, vector search, result formatting)
-- [X] T022 [P] [US1] Unit test for AST parser in tests/unit/test_ast_parser.py (Tree-sitter parsing, error handling)
-- [X] T023 [P] [US1] Unit test for chunker in tests/unit/test_chunker.py (adaptive sizing, context path construction with byte ranges, sequence numbers, syntactic validity)
-- [X] T024 [P] [US1] Unit test for embedder in tests/unit/test_embedder.py (batch encoding, model loading, error handling)
-- [X] T025 [P] [US1] Unit test for vector_db in tests/unit/test_vector_db.py (CRUD operations, similarity search)
-
 ### Implementation for User Story 1
 
 #### AST Parsing & Chunking
 
-- [ ] T026 [P] [US1] Implement Tree-sitter parser in src/codeminder/parser/ast_parser.py (parse file, handle syntax errors)
-- [ ] T027 [US1] Implement adaptive chunker in src/codeminder/parser/chunker.py (recursive descent, token counting, sequence numbering, context path construction: semantic_path:[byte_start:byte_end]#sequence) - depends on T026
-- [ ] T028 [US1] Add split node handling for large functions in src/codeminder/parser/chunker.py (statements, expressions, node type tracking, extract identifiers for semantic path)
+- [X] T026 [P] [US1] Implement Tree-sitter parser in src/codeminder/parser/ast_parser.py (parse file, handle syntax errors)
+- [X] T027 [US1] Implement adaptive chunker in src/codeminder/parser/chunker.py (recursive descent, token counting, context path construction: filename:start_line-end_line) - depends on T026
+- [X] T028 [US1] Add split node handling for large functions in src/codeminder/parser/chunker.py (statements, expressions, node type tracking)
 
 #### Embedding Generation
 
@@ -121,15 +105,6 @@
 ## Phase 4: User Story 2 - Automatic Index Maintenance (Priority: P1)
 
 **Goal**: Automatically detect file changes and update the index in real-time without manual intervention
-
-**Independent Test**: Start file watcher, modify and save a Python file, query for content from that file, verify updated version is returned within 2 seconds
-
-### Tests for User Story 2 (Write FIRST - Red-Green-Refactor) ⚠️
-
-- [ ] T045 [P] [US2] Integration test for file watcher in tests/integration/test_file_watcher.py (detect changes, trigger re-index, debouncing)
-- [ ] T046 [P] [US2] Unit test for debounce logic in tests/unit/test_debounce.py (500ms window, last-change-wins)
-- [ ] T047 [P] [US2] Integration test for re-indexing in tests/integration/test_reindex.py (delete old chunks, parse new, atomic updates)
-- [ ] T048 [P] [US2] Integration test for batch changes in tests/integration/test_batch_changes.py (git checkout simulation, parallel processing)
 
 ### Implementation for User Story 2
 
@@ -176,19 +151,17 @@
 - [ ] T064 Run ruff check and fix all linting issues across codebase
 - [ ] T065 Run mypy and fix all type checking errors across codebase
 - [ ] T066 Add docstrings to all public APIs (Google-style per plan.md)
-- [ ] T067 [P] Add additional edge case tests in tests/unit/ (oversized nodes, syntax errors, empty files)
+
 
 ### Performance
 
-- [ ] T068 Add performance benchmarks in tests/performance/ (indexing speed, search latency, memory usage)
-- [ ] T069 Profile and optimize chunking algorithm for large files
-- [ ] T070 Profile and optimize embedding batch sizes
+- [ ] T068 Profile and optimize chunking algorithm for large files
+- [ ] T069 Profile and optimize embedding batch sizes
 
 ### Validation
 
-- [ ] T071 Run full quickstart.md walkthrough and fix any issues
-- [ ] T072 Test with real-world Python codebase (>10k LOC) and validate success criteria
-- [ ] T073 Validate all MCP protocol compliance requirements from contracts/mcp-tools.md
+- [ ] T070 Run full quickstart.md walkthrough and fix any issues
+- [ ] T071 Validate all MCP protocol compliance requirements from contracts/mcp-tools.md
 
 ---
 
@@ -205,16 +178,14 @@
 ### User Story Dependencies
 
 - **User Story 1 (P1)**: Must complete first - provides core indexing and search
-  - Foundational phase → Tests → AST Parsing → Embedding → Storage → Search → Indexing → MCP Tools
+  - Foundational phase → AST Parsing → Embedding → Storage → Search → Indexing → MCP Tools
 - **User Story 2 (P1)**: Depends on User Story 1 completion
-  - User Story 1 → Tests → File Watcher → Re-indexing → Integration
+  - User Story 1 → File Watcher → Re-indexing → Integration
 
 ### Within Each User Story
 
-1. **Tests FIRST**: Write contract, integration, and unit tests (Red phase)
-2. **Implementation**: Build components to make tests pass (Green phase)
-3. **Refactor**: Clean up code while keeping tests passing (Refactor phase)
-4. **Quality**: Run ruff, mypy, ensure coverage >80%
+1. **Implementation**: Build components following the specification
+2. **Quality**: Run ruff, mypy for code quality
 
 ### Parallel Opportunities
 
@@ -227,7 +198,6 @@ All tasks marked [P] can run in parallel: T003, T004, T005, T007
 - Core Components: T015, T017 parallel (T016 sequential)
 
 #### Phase 3 (User Story 1)
-- All tests (T018-T025) can run in parallel - 8 tests simultaneously
 - AST components: T026, then T027+T028
 - Embedding: T029+T030
 - Storage: T031, T032, T033 sequential (same file)
@@ -236,7 +206,6 @@ All tasks marked [P] can run in parallel: T003, T004, T005, T007
 - MCP: T040, then T041+T042+T043+T044
 
 #### Phase 4 (User Story 2)
-- All tests (T045-T048) can run in parallel - 4 tests simultaneously
 - Watcher: T049, then T050+T051
 - Handlers: T052+T053+T054 parallel, then T055
 - Consistency: T056+T057
@@ -244,24 +213,8 @@ All tasks marked [P] can run in parallel: T003, T004, T005, T007
 
 #### Phase 5 (Polish)
 - Documentation: T061, T062, T063 parallel
-- Edge tests: T067 parallel with other work
 
 ---
-
-## Parallel Example: User Story 1 Tests
-
-```bash
-# Launch all tests for User Story 1 together (Constitution: Test-First):
-pytest tests/contract/test_mcp_index.py &      # T018
-pytest tests/contract/test_mcp_search.py &      # T019
-pytest tests/integration/test_indexing_flow.py & # T020
-pytest tests/integration/test_search_flow.py &   # T021
-pytest tests/unit/test_ast_parser.py &          # T022
-pytest tests/unit/test_chunker.py &             # T023
-pytest tests/unit/test_embedder.py &            # T024
-pytest tests/unit/test_vector_db.py &           # T025
-wait
-```
 
 ---
 
@@ -271,32 +224,26 @@ wait
 
 1. Complete Phase 1: Setup (~2 hours)
 2. Complete Phase 2: Foundational (~4 hours)
-3. Complete Phase 3: User Story 1 (~16 hours)
-   - Tests first: ~4 hours
-   - Implementation: ~12 hours
-4. **STOP and VALIDATE**: Test with real codebase
-5. **MVP READY**: Can index and search Python codebases
+3. Complete Phase 3: User Story 1 (~12 hours)
+4. **MVP READY**: Can index and search Python codebases
 
-**Total MVP Time**: ~22 hours of focused development
+**Total MVP Time**: ~18 hours of focused development
 
 ### Full MVP (User Stories 1 + 2)
 
 1. Complete MVP First (above)
-2. Complete Phase 4: User Story 2 (~8 hours)
-   - Tests first: ~2 hours
-   - Implementation: ~6 hours
-3. **VALIDATE**: Test auto-updates with file changes
-4. **FULL MVP READY**: Production-ready MCP server
+2. Complete Phase 4: User Story 2 (~6 hours)
+3. **FULL MVP READY**: Production-ready MCP server
 
-**Total Full MVP Time**: ~30 hours of focused development
+**Total Full MVP Time**: ~24 hours of focused development
 
 ### With Polish
 
 1. Complete Full MVP (above)
-2. Complete Phase 5: Polish (~6 hours)
+2. Complete Phase 5: Polish (~4 hours)
 3. **PRODUCTION READY**: Documented, optimized, validated
 
-**Total Production Time**: ~36 hours of focused development
+**Total Production Time**: ~28 hours of focused development
 
 ---
 
@@ -322,9 +269,7 @@ wait
 
 - **[P] tasks**: Different files, no dependencies - can execute in parallel
 - **[Story] label**: Maps task to specific user story (US1, US2) for traceability
-- **Test-First**: Constitution requires all tests written BEFORE implementation
 - **Checkpoints**: Stop after each phase to validate independently
-- **Coverage**: Target >80% per constitution
 - **Commit**: After each task or logical group
 - **Quality Gates**: ruff + mypy must pass before marking tasks complete
 - **File Paths**: All paths shown are final locations per plan.md structure

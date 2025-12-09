@@ -177,14 +177,10 @@ async def watch_codebase(path: str):
    - If node > limit: Descend into named children (split class into methods, split function into statements)
    - If statement/expression > limit: Descend further (split compound statements, expressions)
    - If atomic node > limit: Yield with warning (rare case: extremely long strings or comments)
-4. **Context Path Construction**: Format is `semantic_path:[byte_start:byte_end]#sequence`
-   - **Semantic path**: Extract identifier names from ancestor nodes during traversal
-     - For `class_definition`: Extract class name from identifier child node
-     - For `function_definition`: Extract function name from identifier child node
-     - Join with dots: `ClassName.method_name` or `outer_func.inner_func`
-   - **Byte range**: Use `node.start_byte` and `node.end_byte` from Tree-sitter
-   - **Sequence**: Add `#0`, `#1`, etc. for split chunks (only when node is split)
-   - **Examples**: `authenticate:[1024:1580]`, `AuthService.login:[2048:3072]`, `process_data:[5120:6144]#0`
+4. **Context Path Construction**: Format is `filename:start_line-end_line`
+   - **Filename**: Relative path from codebase root
+   - **Line range**: Start and end line numbers (1-indexed, inclusive)
+   - **Examples**: `auth_service.py:42-58`, `src/utils/helpers.py:102-115`
 5. **Chunk Identification**: Assign unique IDs and track AST node type (function_definition, if_statement, expression, etc.)
 
 **Rationale**:
@@ -194,79 +190,42 @@ async def watch_codebase(path: str):
 
 **Implementation Pseudocode**:
 ```python
-def extract_identifier(node):
-    """Extract identifier name from function/class definition node."""
-    for child in node.children:
-        if child.type == 'identifier':
-            return child.text.decode()
-    return None
-
-def chunk_ast_node(node, semantic_path="", max_tokens=2048, seq_num=0):
+def chunk_ast_node(node, file_path, max_tokens=2048, seq_num=0):
     code = node.text.decode()
     tokens = count_tokens(code)
     
-    # Build context_path: semantic_path:[byte_start:byte_end]#sequence
-    byte_range = f"[{node.start_byte}:{node.end_byte}]"
-    sequence_suffix = f"#{seq_num}" if seq_num > 0 else ""
-    context_path = f"{semantic_path}:{byte_range}{sequence_suffix}"
+    # Build context_path: filename:start_line-end_line
+    start_line = node.start_point[0] + 1  # Convert 0-indexed to 1-indexed
+    end_line = node.end_point[0] + 1
+    context_path = f"{file_path}:{start_line}-{end_line}"
     
     if tokens <= max_tokens:
         yield CodeChunk(
             code=code,
             context_path=context_path,
             node_type=node.type,
-            start_line=node.start_point[0],
-            end_line=node.end_point[0],
+            start_line=start_line,
+            end_line=end_line,
             sequence_number=seq_num
         )
     elif node.named_children:
         # Recursively split into child nodes (methods, statements, expressions)
         for idx, child in enumerate(node.named_children):
-            # Update semantic path if child has identifier
-            child_identifier = extract_identifier(child)
-            if child_identifier:
-                child_semantic = f"{semantic_path}.{child_identifier}" if semantic_path else child_identifier
-            else:
-                child_semantic = semantic_path  # Inherit parent's semantic path for split nodes
-            
-            yield from chunk_ast_node(child, child_semantic, max_tokens, idx)
+            yield from chunk_ast_node(child, file_path, max_tokens, idx)
     else:
         # Atomic node exceeding limit (rare: very long string/comment)
         logger.warning(f"Atomic node exceeds limit: {context_path}")
         yield CodeChunk(
             code=code,
-            context_path=f"{context_path}[OVERSIZED]",
+            context_path=f"{context_path}",
             node_type=node.type,
-            start_line=node.start_point[0],
-            end_line=node.end_point[0],
+            start_line=start_line,
+            end_line=end_line,
             sequence_number=0
         )
 ```
 
-**Traversal from context_path**:
-```python
-def find_node_by_context_path(tree, context_path):
-    """Locate AST node using context_path."""
-    # Parse: "ClassName.method:[1024:1580]#0"
-    parts = context_path.rsplit(':', 1)
-    semantic_path = parts[0]
-    
-    # Extract byte range
-    byte_part = parts[1].split('#')[0]  # Remove sequence suffix if present
-    start, end = map(int, byte_part.strip('[]').split(':'))
-    
-    # DFS to find node with matching byte range
-    def dfs(node):
-        if node.start_byte == start and node.end_byte == end:
-            return node
-        for child in node.children:
-            result = dfs(child)
-            if result:
-                return result
-        return None
-    
-    return dfs(tree.root_node)
-```
+
 
 ---
 

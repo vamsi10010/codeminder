@@ -54,7 +54,7 @@ Represents a logical unit of code extracted via AST parsing (function, class, me
 | `chunk_id` | UUID | Unique identifier | Primary key, generated |
 | `file_id` | UUID | Foreign key to File | Required, indexed |
 | `source_code` | str | The actual code text | Required, 1-8192 tokens |
-| `context_path` | str | AST-traversable semantic path with byte range | Required, e.g., "AuthService.authenticate:[1024:1580]" or "validate:[2048:2512]#0" for splits |
+| `context_path` | str | File path with line range | Required, e.g., "auth_service.py:42-58" |
 | `start_line` | int | Line number where chunk starts (1-indexed) | Required, > 0 |
 | `end_line` | int | Line number where chunk ends (1-indexed) | Required, >= start_line |
 | `token_count` | int | Number of tokens in source_code | Required, > 0, <= 8192 |
@@ -70,59 +70,27 @@ Represents a logical unit of code extracted via AST parsing (function, class, me
 
 ### Business Rules
 
-- **Context Path Construction**: Format is `semantic_path:[byte_start:byte_end]#sequence`
-  - **Semantic path**: Dot-separated identifier names extracted from AST during traversal
-    - Module-level: `function_name` or `ClassName`
-    - Nested: `ClassName.method_name` or `outer_func.inner_func`
-    - For anonymous/split nodes: Include parent type as context (e.g., `process_data.if` for statement inside if block)
-    - Extract from Tree-sitter identifier nodes in parent chain
-  - **Byte range**: `[node.start_byte:node.end_byte]` from Tree-sitter pointing to **the actual chunked node**
-    - Each chunk's byte range identifies the exact AST node being chunked
-    - Provides unique, stable location independent of whitespace/comments
-    - Used for AST traversal: parse file, DFS to find node matching byte range
-    - **Important**: Byte range is NOT the oversized parent, but the specific node/statement being chunked
-  - **Sequence suffix**: `#0`, `#1`, `#2`, etc. for multiple chunks split from **the same parent node** (optional, omitted if not split)
-    - Only applies when a single parent node is split into multiple sibling chunks
-    - Not used for unrelated chunks at same level
+- **Context Path Construction**: Format is `filename:start_line-end_line`
+  - **Filename**: Relative path from codebase root (e.g., `src/auth/service.py`)
+  - **Line range**: `start_line-end_line` (1-indexed, inclusive)
   - **Examples**:
-    - `authenticate:[1024:1580]` - module-level function (unsplit, fits in token limit)
-    - `AuthService.login:[2048:3072]` - method in class (unsplit, fits in token limit)
-    - `UserManager.get_user.validate:[4096:4512]` - nested function (unsplit, fits in token limit)
-    - `process_data.if:[1150:1800]#0` - first statement inside split if block (byte range = statement node)
-    - `process_data.if:[1850:2500]#1` - second statement inside split if block (byte range = statement node)
-    - `process_data:[4250:5050]` - for loop sibling of if block (no sequence, different node)
+    - `auth_service.py:42-58` - function spanning lines 42 to 58
+    - `src/utils/helpers.py:102-115` - nested function in subdirectory
+    - `models/user.py:25-89` - class definition
 - **Token count** is computed using tiktoken library before storage
 - Chunks with `token_count > 2048` (default limit) are recursively split into child AST nodes (statements, expressions)
-- `sequence_number` tracks position for multiple chunks split from **the same parent node** (0 for first part or unsplit nodes, 1+ for subsequent parts of a split)
-  - Used when a parent node (e.g., large if statement) is split into multiple child chunks
-  - Each child chunk from the same parent gets incrementing sequence numbers
-  - Sibling nodes that are NOT part of a split do not share sequence numbers
 - Each chunk must be syntactically valid: a complete AST node (function, statement, or expression)
 - When file is re-indexed, all old chunks are deleted atomically before new ones are inserted
-
-### Context Path Traversal Algorithm
-
-To locate a chunk's AST node from its context_path:
-
-1. Parse `context_path` to extract: `semantic_path`, `byte_start`, `byte_end`, `sequence` (if present)
-2. Parse source file with Tree-sitter to get AST
-3. Perform depth-first search to find the exact node where:
-   - `node.start_byte == byte_start` AND
-   - `node.end_byte == byte_end`
-   - This identifies the specific AST node that was chunked (statement, expression, function, etc.)
-4. Optional validation: Extract semantic path from node's ancestor identifiers, verify match
-5. For split chunks: The sequence number distinguishes between multiple chunks from the same parent
-   - Example: Three statements split from an if block all share the same semantic path but different byte ranges and sequence numbers
 
 ### Example Data
 
 ```python
-# Example 1: Unsplit function (fits in token limit)
+# Example 1: Function chunk
 CodeChunk(
     chunk_id="550e8400-e29b-41d4-a716-446655440000",
     file_id="<file-uuid>",
     source_code="def authenticate(username, password):\n    # ...",
-    context_path="AuthService.authenticate:[10240:15800]",
+    context_path="auth_service.py:42-58",
     start_line=42,
     end_line=58,
     token_count=384,
@@ -131,12 +99,12 @@ CodeChunk(
     language="python"
 )
 
-# Example 2: First statement inside a split if block
+# Example 2: Statement chunk from split function
 CodeChunk(
     chunk_id="660e8400-e29b-41d4-a716-446655440001",
     file_id="<file-uuid>",
     source_code="logger.error('Validation failed')\nlog_details(data)",
-    context_path="AuthService.process_login.if:[21500:22100]#0",
+    context_path="auth_service.py:102-103",
     start_line=102,
     end_line=103,
     token_count=156,
@@ -145,12 +113,12 @@ CodeChunk(
     language="python"
 )
 
-# Example 3: Sibling for loop (NOT part of split if block)
+# Example 3: For loop chunk
 CodeChunk(
     chunk_id="770e8400-e29b-41d4-a716-446655440002",
     file_id="<file-uuid>",
     source_code="for item in data:\n    process(item)",
-    context_path="AuthService.process_login:[24500:25200]",
+    context_path="auth_service.py:115-116",
     start_line=115,
     end_line=116,
     token_count=180,
@@ -182,7 +150,7 @@ Represents the vector embedding of a CodeChunk, generated by sentence-transforme
 
 ### Business Rules
 
-- `vector` is generated locally using sentence-transformers with `source_code` + `context_path` as input
+- `vector` is generated locally using sentence-transformers with `source_code` as input
 - `model_version` is stored to detect when re-embedding is needed (e.g., model upgrade or config change)
 - Embeddings are stored in LanceDB for efficient similarity search
 - When CodeChunk is deleted, its Embedding is also deleted (cascade)

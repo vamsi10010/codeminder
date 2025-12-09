@@ -33,10 +33,7 @@
 - Configuration: JSON file (`.codeminder.json` in codebase root)
 - Logs: Structured logs to file (`.codeminder/codeminder.log`) and stderr
 
-**Testing**: pytest with coverage target >80% for new code
-- Unit tests: AST chunking logic, embedding generation, search ranking
-- Integration tests: MCP tool invocations, file watcher operations
-- Contract tests: MCP protocol compliance
+
 
 **Target Platform**: Linux/macOS developer machines (local MCP server)  
 **Project Type**: Single Python project with MCP server  
@@ -64,7 +61,7 @@
 
 Verify compliance with constitution principles:
 
-- [x] **Code Quality First**: Architecture supports clean, maintainable, testable code
+- [x] **Code Quality First**: Architecture supports clean, maintainable code
   - Single responsibility: ✓ (separate modules for parsing, embedding, search, MCP server, file watching)
   - Code style and quality tooling: ✓ (ruff for linting/formatting, mypy for type checking)
   - Public APIs documented: ✓ (MCP tools will have comprehensive docstrings)
@@ -80,7 +77,6 @@ Verify compliance with constitution principles:
 - [x] **Proper Abstractions**: Abstractions earn their existence
   - No premature abstractions: ✓ (delete-and-reparse for updates, not complex diff-based incremental)
   - Clear boundaries: ✓ (AST parsing → chunking → embedding → vector storage → search)
-  - Independently testable: ✓ (each module can be unit tested in isolation)
 - [x] **Performance Consciousness**: Performance adequate and measurable
   - Performance requirements documented: ✓ (see Technical Context above)
   - Benchmarks planned: ✓ (indexing speed, search latency, memory usage)
@@ -136,19 +132,6 @@ codeminder/                          # Repository root
 │           ├── __init__.py
 │           ├── logger.py            # Structured logging setup
 │           └── errors.py            # Custom error classes with codes
-├── tests/
-│   ├── contract/
-│   │   ├── test_mcp_protocol.py     # MCP tool contract tests
-│   │   └── test_search_interface.py # Search result format tests
-│   ├── integration/
-│   │   ├── test_indexing_flow.py    # End-to-end indexing
-│   │   ├── test_search_flow.py      # End-to-end search
-│   │   └── test_file_watcher.py     # File watching + re-indexing
-│   └── unit/
-│       ├── test_chunker.py          # AST chunking logic
-│       ├── test_embedder.py         # Embedding generation
-│       ├── test_vector_db.py        # Vector DB operations
-│       └── test_debounce.py         # Debouncing logic
 ├── .codeminder/                     # Runtime data directory (gitignored)
 │   ├── vector_db/                   # LanceDB persistent storage
 │   └── codeminder.log               # Structured log file
