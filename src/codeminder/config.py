@@ -6,6 +6,10 @@ from pydantic import BaseModel, Field, field_validator
 
 class Configuration(BaseModel):
     codebase_path: str = Field(default=".", description="Path to the codebase to index")
+    chunking_strategy: str = Field(
+        default="ast",
+        description="Chunking strategy: 'ast' for syntax-aware or 'line' for token-based",
+    )
     embedding_model: str = Field(
         default="jinaai/jina-embeddings-v2-base-code",
         description="sentence-transformers model name",
@@ -39,6 +43,17 @@ class Configuration(BaseModel):
         if not path.is_dir():
             raise ValueError(f"Codebase path is not a directory: {v}")
         return str(path)
+
+    @field_validator("chunking_strategy")
+    @classmethod
+    def validate_chunking_strategy(cls, v: str) -> str:
+        valid_strategies = {"ast", "line"}
+        lower_v = v.lower()
+        if lower_v not in valid_strategies:
+            raise ValueError(
+                f"Invalid chunking strategy: {v}. Must be one of {valid_strategies}"
+            )
+        return lower_v
 
     @field_validator("log_level")
     @classmethod

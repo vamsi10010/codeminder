@@ -10,7 +10,7 @@ from typing import Any
 from .config import Configuration
 from .embeddings.embedder import Embedder
 from .parser.ast_parser import ASTParser
-from .parser.chunker import Chunker
+from .parser.chunker import create_chunker
 from .parser.scanner import FileScanner
 from .storage.models import File, ParseStatus
 from .storage.vector_db import VectorDB
@@ -69,7 +69,9 @@ class IndexingService:
         """
         self.config = config
         self.scanner = FileScanner(config.codebase_path)
-        self.chunker = Chunker(token_limit=config.token_limit)
+        self.chunker = create_chunker(
+            strategy=config.chunking_strategy, token_limit=config.token_limit
+        )
         self.embedder = Embedder(model_name=config.embedding_model)
         self.vector_db = VectorDB(persist=config.persist_index)
         self._semaphore: asyncio.Semaphore | None = None

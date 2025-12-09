@@ -5,17 +5,19 @@
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
+**Last Updated**: 2025-12-09 - Added configurable chunking strategy feature (\"ast\" vs \"line\")
+
 ## Summary
 
 **Primary Requirement**: Build an MCP server that bridges the "context gap" in AI coding assistants by enabling intelligent, syntax-aware code retrieval through AST-based chunking and semantic search.
 
 **Technical Approach**: 
-- **Parsing**: Tree-sitter for language-agnostic AST parsing ensuring code is chunked by valid syntax (functions/classes) rather than arbitrary lines
+- **Parsing**: Tree-sitter for language-agnostic AST parsing ensuring code is chunked by valid syntax (functions/classes) rather than arbitrary lines ("ast" strategy, default); alternatively, "line" strategy for raw token-based splitting
 - **Embeddings**: sentence-transformers for local, privacy-preserving embedding generation with configurable models (default: jinaai/jina-embeddings-v2-base-code)
 - **Database**: LanceDB as embedded, serverless vector database running in-process for local operation
 - **Server**: FastMCP (Python) for Model Context Protocol implementation via decorators
 - **File Watcher**: Watchfiles (Rust-based) for automatic re-indexing with debouncing
-- **Algorithm**: Adaptive "Largest Valid Node" AST chunking strategy with context tagging
+- **Algorithm**: Two chunking strategies - (1) Adaptive "Largest Valid Node" AST strategy (default) with context tagging for syntactically valid chunks, (2) Line-based strategy using sliding window over token count for simpler, faster chunking without AST overhead
 
 ## Technical Context
 
@@ -31,7 +33,7 @@
 **Storage**: 
 - **File registry**: LanceDB `file_registry` table (persisted, enables startup reconciliation)
 - **Vector embeddings**: LanceDB `code_chunks` table (persisted to `.codeminder/vector_db/`)
-- **Configuration**: JSON file (`.codeminder.json` in codebase root)
+- **Configuration**: JSON file (`.codeminder.json` in codebase root) including `chunking_strategy` field ("ast" or "line", default "ast")
 - **Logs**: Structured logs to file (`.codeminder/codeminder.log`) and stderr
 
 **Startup Behavior**:
@@ -120,7 +122,9 @@ codeminder/                          # Repository root
 │       ├── parser/
 │       │   ├── __init__.py
 │       │   ├── ast_parser.py        # Tree-sitter AST parsing
-│       │   └── chunker.py           # Adaptive "Largest Valid Node" chunking
+│       │   ├── ast_chunker.py       # AST-based "Largest Valid Node" chunking (default)
+│       │   ├── line_chunker.py      # Line-based token-count chunking (alternative)
+│       │   └── chunker.py           # Chunker factory (creates ASTChunker or LineChunker)
 │       ├── embeddings/
 │       │   ├── __init__.py
 │       │   ├── embedder.py          # Jina Embeddings integration

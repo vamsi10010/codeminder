@@ -28,6 +28,7 @@
 - [x] T003 [P] Configure ruff (linting/formatting) in pyproject.toml
 - [x] T004 [P] Configure mypy (type checking) with strict mode in pyproject.toml
 - [x] T005 Create .codeminder.json.example configuration template with all options
+- [x] T005a Update .codeminder.json.example to include chunking_strategy field with documentation ("ast" or "line", default "ast")
 - [x] T007 [P] Setup .gitignore (.codeminder/, .venv/, __pycache__, *.pyc)
 - [x] T008 Create README.md with project overview and quickstart reference
 
@@ -42,7 +43,7 @@
 ### Configuration & Utilities
 
 - [x] T009 Implement Configuration model in src/codeminder/config.py with Pydantic validation
-- [ ] T009a Implement configuration validation in src/codeminder/config.py (required fields: codebase_path exists, token_limit positive integer 512-8192, concurrency_limit range 1-16, validate model_name format)
+- [x] T009a Implement configuration validation in src/codeminder/config.py (required fields: codebase_path exists, token_limit positive integer 512-8192, concurrency_limit range 1-16, chunking_strategy in ["ast", "line"], validate model_name format)
 - [x] T010 [P] Implement structured logging in src/codeminder/utils/logger.py (JSON format, levels DEBUG/INFO/WARN/ERROR, configure handlers for both .codeminder/codeminder.log and stderr)
 - [x] T011 [P] Implement error classes with codes in src/codeminder/utils/errors.py (CONFIG_ERROR, PARSE_ERROR, DB_UNAVAILABLE, EMBEDDING_ERROR, WATCHER_ERROR, INDEX_NOT_READY, SEARCH_ERROR)
 
@@ -75,6 +76,9 @@
 - [X] T026 [P] [US1] Implement Tree-sitter parser in src/codeminder/parser/ast_parser.py (parse file, handle syntax errors)
 - [X] T027 [US1] Implement adaptive chunker in src/codeminder/parser/chunker.py (recursive descent, token counting, context path construction: filename:start_line-end_line) - depends on T026
 - [X] T028 [US1] Add split node handling for large functions in src/codeminder/parser/chunker.py (statements, expressions, node type tracking)
+- [x] T027a [US1] Refactor existing Chunker to ASTChunker class in src/codeminder/parser/ast_chunker.py (move current chunker.py implementation, maintain same interface: chunk(file) -> list[CodeChunk])
+- [x] T027b [US1] Implement LineChunker class in src/codeminder/parser/line_chunker.py (split by token count using sliding window, maintain line boundaries, set node_type="line_chunk", same interface as ASTChunker)
+- [x] T027c [US1] Create chunker factory in src/codeminder/parser/chunker.py (create_chunker(strategy: str, token_limit: int) -> ASTChunker | LineChunker based on config.chunking_strategy)
 
 #### Embedding Generation
 
@@ -96,6 +100,7 @@
 
 - [X] T036 [US1] Implement file scanner in src/codeminder/parser/scanner.py (recursive directory traversal, extension filtering, excluded patterns)
 - [X] T037 [US1] Implement indexing service in src/codeminder/server.py (scan → parse → chunk → embed → store pipeline, persist File records)
+- [x] T037c [US1] Update indexing service in src/codeminder/server.py to use chunker factory (create_chunker(config.chunking_strategy, config.token_limit) instead of direct Chunker instantiation)
 - [X] T037a [US1] Implement startup reconciliation in src/codeminder/server.py (load file_registry from LanceDB → scan filesystem → compare File.last_modified (mtime) vs File.last_indexed per data-model.md → queue changes: INDEX new, REINDEX modified, DELETE removed)
 - [X] T037b [US1] Add reconciliation action processor in src/codeminder/server.py (INDEX new files, REINDEX modified files, DELETE removed files)
 - [X] T038 [US1] Add parallel processing in src/codeminder/server.py (asyncio.Semaphore initialized with config.concurrency_limit, wrap file processing in async context manager for rate limiting)

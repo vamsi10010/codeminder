@@ -54,7 +54,7 @@ Represents a source code file in the monitored codebase. **File metadata is pers
 
 ## 2. CodeChunk
 
-Represents a logical unit of code extracted via AST parsing (function, class, method).
+Represents a logical unit of code extracted via either AST parsing (function, class, method) or line-based splitting.
 
 ### Attributes
 
@@ -67,7 +67,7 @@ Represents a logical unit of code extracted via AST parsing (function, class, me
 | `start_line` | int | Line number where chunk starts (1-indexed) | Required, > 0 |
 | `end_line` | int | Line number where chunk ends (1-indexed) | Required, >= start_line |
 | `token_count` | int | Number of tokens in source_code | Required, > 0, <= 8192 |
-| `node_type` | str | AST node type | Required, e.g., "function_definition", "if_statement", "expression" |
+| `node_type` | str | AST node type or "line_chunk" | Required, e.g., "function_definition", "if_statement", "expression" for ast strategy; "line_chunk" for line strategy |
 | `sequence_number` | int | Sequence index for split nodes | Required, 0 for unsplit, 1+ for split parts |
 | `language` | str | Inherited from File | Required |
 | `created_at` | datetime | When chunk was created | Required |
@@ -87,8 +87,8 @@ Represents a logical unit of code extracted via AST parsing (function, class, me
     - `src/utils/helpers.py:102-115` - nested function in subdirectory
     - `models/user.py:25-89` - class definition
 - **Token count** is computed using tiktoken library before storage
-- Chunks with `token_count > 2048` (default limit) are recursively split into child AST nodes (statements, expressions)
-- Each chunk must be syntactically valid: a complete AST node (function, statement, or expression)
+- **AST strategy**: Chunks with `token_count > 2048` (default limit) are recursively split into child AST nodes (statements, expressions); each chunk must be syntactically valid (complete AST node)
+- **Line strategy**: Files are split by raw token count using sliding window; chunks have `node_type = "line_chunk"` and may not be syntactically complete units
 - When file is re-indexed, all old chunks are deleted atomically before new ones are inserted
 
 ### Example Data
@@ -133,6 +133,20 @@ CodeChunk(
     token_count=180,
     node_type="for_statement",
     sequence_number=0,
+    language="python"
+)
+
+# Example 4: Line-based chunk (line strategy)
+CodeChunk(
+    chunk_id="880e8400-e29b-41d4-a716-446655440003",
+    file_id="<file-uuid>",
+    source_code="    return user\n\ndef validate_email(email):",
+    context_path="auth_service.py:67-68",
+    start_line=67,
+    end_line=68,
+    token_count=512,
+    node_type="line_chunk",
+    sequence_number=2,
     language="python"
 )
 ```
@@ -211,6 +225,7 @@ Application configuration loaded at startup.
 | Attribute | Type | Description | Default |
 |-----------|------|-------------|------|
 | `codebase_path` | str | Root directory to index | "." (current directory) |
+| `chunking_strategy` | str | Chunking method: "ast" or "line" | "ast" |
 | `embedding_model` | str | HuggingFace model ID | "jinaai/jina-embeddings-v2-base-code" |
 | `token_limit` | int | Max tokens per chunk | 2048 |
 | `max_search_results` | int | Number of results to return | 20 |

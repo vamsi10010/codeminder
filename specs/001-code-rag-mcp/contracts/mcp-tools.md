@@ -294,6 +294,7 @@ Returns current indexing status and statistics.
   },
   "configuration": {
     "codebase_path": "/home/user/project",
+    "chunking_strategy": "ast",
     "token_limit": 2048,
     "concurrency_limit": 4,
     "debounce_ms": 500

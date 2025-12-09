@@ -2,6 +2,7 @@
 
 **Feature Branch**: `001-code-rag-mcp`  
 **Created**: 2025-12-07  
+**Last Updated**: 2025-12-09 - Added configurable chunking strategy feature  
 **Status**: Draft  
 **Input**: User description: "Develop codeminder, an MCP server that implements retrieval augmented generation for code bases"
 
@@ -97,7 +98,8 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 - **FR-001**: System MUST parse code files into Abstract Syntax Trees (AST) to identify logical boundaries such as functions, classes, methods, statements, and expressions
 - **FR-002**: System MUST chunk code at valid AST node boundaries, ensuring each chunk is syntactically valid (can be parsed independently)
 - **FR-003**: System MUST apply adaptive sizing - if a chunk's source_code fits within token limits (limit applies to code text only, not metadata), index it whole; otherwise recursively descend to child nodes (e.g., split large functions into individual statements or expression blocks)
-- **FR-004**: System MUST tag each code chunk with metadata including file path, line numbers, context path in format `filename:start_line-end_line` (see data-model.md for specification), AST node type (e.g., function_definition, if_statement, expression), and chunk sequence number for split nodes
+- **FR-003a**: System MUST support two chunking strategies configurable via .codeminder.json: (1) "ast" strategy (default) that chunks at AST node boundaries ensuring syntactic validity, and (2) "line" strategy that splits files by raw token count without AST parsing, using sliding window approach with line-based boundaries
+- **FR-004**: System MUST tag each code chunk with metadata including file path, line numbers, context path in format `filename:start_line-end_line` (see data-model.md for specification), AST node type (e.g., function_definition, if_statement, expression) for ast strategy or "line_chunk" for line strategy, and chunk sequence number for split nodes
 - **FR-005**: System MUST embed code chunks into vector representations using a semantic embedding model suitable for code
 - **FR-006**: System MUST store embeddings in a vector database that supports similarity search, operating in-memory with optional disk persistence to avoid full re-indexing on restart
 - **FR-007**: System MUST expose an MCP-compliant server interface following the Model Context Protocol specification
@@ -159,6 +161,7 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 - **SC-004**: AI assistants can solve HumanEval problems using only retrieved "hidden" helper functions with >60% success rate
 - **SC-005**: The MCP server successfully responds to 99% of valid search requests without crashes or errors
 - **SC-006**: Initial codebase indexing completes within 5 seconds per 1,000 lines of code
+- **SC-012**: Users can select chunking strategy ("ast" or "line") via configuration, and the system correctly applies the chosen strategy during indexing with appropriate metadata (node_type reflects strategy used)
 
 #### Phase 2 Success Criteria
 
@@ -187,7 +190,9 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 
 ### In Scope (Phase 1)
 
-- AST-based code chunking for Python
+- AST-based code chunking for Python (default strategy)
+- Line-based code chunking as alternative strategy
+- Configurable chunking strategy selection
 - Semantic search using vector embeddings
 - MCP server implementation with `search_code` and `index_codebase` tools
 - Real-time file watching and automatic re-indexing
