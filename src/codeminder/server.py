@@ -245,7 +245,7 @@ class IndexingService:
     async def _process_reconciliation_actions(
         self, actions: list[tuple[ReconciliationAction, Path | File]]
     ) -> list[Any]:
-        """Process reconciliation actions in parallel.
+        """Process reconciliation actions in parallel with periodic GPU cleanup.
 
         Args:
             actions: List of (action, file_or_path) tuples.
@@ -272,6 +272,11 @@ class IndexingService:
         for result in results:
             if isinstance(result, Exception):
                 logger.error(f"Reconciliation action failed: {result}")
+
+        # Explicitly clear GPU cache after batch processing to prevent memory buildup
+        # This is critical for large indexing operations that process many files
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self.embedder.cleanup)
 
         return results
 
@@ -471,6 +476,10 @@ class IndexingService:
 
         finally:
             self._indexing_in_progress = False
+            # Final GPU cleanup after indexing completes
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, self.embedder.cleanup)
+            logger.info("GPU memory cleaned up after indexing")
 
     def _detect_language(self, file_path: Path) -> str:
         """Detect programming language from file extension.
@@ -552,3 +561,13 @@ class IndexingService:
                 "indexing_in_progress": self._indexing_in_progress,
                 "error": str(e),
             }
+
+    async def cleanup(self) -> None:
+        """Clean up resources and release GPU memory.
+
+        Should be called during graceful shutdown to free GPU resources.
+        """
+        logger.info("Cleaning up IndexingService resources...")
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self.embedder.cleanup)
+        logger.info("IndexingService cleanup complete")

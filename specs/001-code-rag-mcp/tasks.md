@@ -168,6 +168,8 @@
 
 - [ ] T068 Profile and optimize chunking algorithm for large files
 - [ ] T069 Profile and optimize embedding batch sizes
+- [X] T069a Implement GPU memory management in src/codeminder/embeddings/embedder.py (add torch.cuda.empty_cache() after encoding, inference mode context manager, cleanup method)
+- [X] T069b Add periodic GPU cleanup in src/codeminder/server.py (clear cache after batch reconciliation, cleanup in index_codebase finally block)
 
 ### Validation
 
