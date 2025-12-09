@@ -46,7 +46,6 @@ class CodeChunk:
     end_line: int = 0
     token_count: int = 0
     node_type: str = ""
-    language: str = ""
     created_at: datetime = field(default_factory=datetime.now)
 
     def to_dict(self) -> dict:
@@ -59,7 +58,6 @@ class CodeChunk:
             "end_line": self.end_line,
             "token_count": self.token_count,
             "node_type": self.node_type,
-            "language": self.language,
             "created_at": self.created_at.isoformat(),
         }
 
