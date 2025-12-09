@@ -7,57 +7,32 @@ from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Supported file extensions
+SUPPORTED_EXTENSIONS = {
+    ".py",  # Python
+}
+
 
 class FileScanner:
     """Scan codebase directory for code files to index."""
 
-    # Supported file extensions
-    SUPPORTED_EXTENSIONS = {
-        ".py",  # Python
-    }
-
-    # Patterns to exclude from scanning
-    EXCLUDED_PATTERNS = {
-        # Python
-        "__pycache__",
-        "*.pyc",
-        "*.pyo",
-        "*.pyd",
-        ".Python",
-        # Virtual environments
-        "venv",
-        ".venv",
-        "env",
-        ".env",
-        "virtualenv",
-        # Version control
-        ".git",
-        ".svn",
-        ".hg",
-        ".bzr",
-        # IDE/Editor
-        ".vscode",
-        ".idea",
-        ".eclipse",
-        ".settings",
-        # Build artifacts
-        "build",
-        "dist",
-        "*.egg-info",
-        ".eggs",
-        # Dependencies
-        "node_modules",
-        "vendor",
-        # OS
-        ".DS_Store",
-        "Thumbs.db",
-        # Test coverage
-        ".coverage",
-        "htmlcov",
-        ".pytest_cache",
-        ".mypy_cache",
-        ".ruff_cache",
-    }
+    @property
+    def excluded_patterns(self) -> set[str]:
+        """Get exclusion patterns from .gitignore and .codeminderignore."""
+        if not hasattr(self, "_excluded_patterns"):
+            self._excluded_patterns = set()
+            for ignore_file_name in [".gitignore", ".codeminderignore"]:
+                ignore_file = self.codebase_path / ignore_file_name
+                if ignore_file.exists():
+                    try:
+                        with open(ignore_file, "r", encoding="utf-8") as f:
+                            for line in f:
+                                line = line.strip()
+                                if line and not line.startswith("#"):
+                                    self._excluded_patterns.add(line)
+                    except Exception as e:
+                        logger.warning(f"Failed to read {ignore_file}: {e}")
+        return self._excluded_patterns
 
     def __init__(self, codebase_path: str):
         """Initialize scanner with codebase root path.
@@ -70,6 +45,9 @@ class FileScanner:
             raise ValueError(f"Codebase path does not exist: {codebase_path}")
         if not self.codebase_path.is_dir():
             raise ValueError(f"Codebase path is not a directory: {codebase_path}")
+
+        self.EXCLUDED_PATTERNS = self.excluded_patterns
+        self.SUPPORTED_EXTENSIONS = SUPPORTED_EXTENSIONS
 
     def scan(self) -> list[Path]:
         """Recursively scan codebase for supported code files.

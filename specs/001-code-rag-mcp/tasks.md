@@ -103,11 +103,11 @@
 
 #### MCP Server
 
-- [ ] T040 [US1] Implement FastMCP server initialization in src/codeminder/server.py (load config, initialize components, run startup reconciliation)
-- [ ] T041 [US1] Implement index_codebase MCP tool in src/codeminder/server.py (trigger indexing, persist File records, return summary)
-- [ ] T042 [US1] Implement search_code MCP tool in src/codeminder/server.py (accept query, return ranked results)
-- [ ] T043 [US1] Add MCP error handling and response formatting in src/codeminder/server.py (structured errors per contracts)
-- [ ] T044 [US1] Add get_index_status MCP tool in src/codeminder/server.py (diagnostics: file count, chunk count, registry status, reconciliation info)
+- [X] T040 [US1] Implement FastMCP server initialization in src/codeminder/server.py (load config, initialize components, run startup reconciliation)
+- [X] T041 [US1] Implement index_codebase MCP tool in src/codeminder/server.py (trigger indexing, persist File records, return summary)
+- [X] T042 [US1] Implement search_code MCP tool in src/codeminder/server.py (accept query, return ranked results)
+- [X] T043 [US1] Add MCP error handling and response formatting in src/codeminder/server.py (structured errors per contracts)
+- [X] T044 [US1] Add get_index_status MCP tool in src/codeminder/server.py (diagnostics: file count, chunk count, registry status, reconciliation info)
 
 **Checkpoint**: User Story 1 complete - MCP server can index Python codebases and perform semantic search
 

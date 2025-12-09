@@ -18,6 +18,9 @@ dependencies = [
     "watchfiles>=1.1.1",
 ]
 
+[project.scripts]
+codeminder = "codeminder.mcp_server:main"
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100

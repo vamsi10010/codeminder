@@ -1,4 +1,4 @@
-"""CodeMinder MCP Server - Main entry point."""
+"""CodeMinder Indexing Service - Core indexing logic."""
 
 import asyncio
 import time
