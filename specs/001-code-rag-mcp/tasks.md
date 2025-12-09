@@ -11,6 +11,12 @@
 - **[Story]**: Which user story this task belongs to (e.g., US1, US2)
 - Include exact file paths in descriptions
 
+**Key Architecture Note**: File registry is now **persisted to LanceDB** in a dedicated `file_registry` table. This enables:
+- Startup reconciliation: Compare persisted timestamps with filesystem to detect changes
+- Efficient re-indexing: Only process files modified since `last_indexed`
+- Fast lookups: O(1) file_id lookup by absolute_path during file watcher events
+- Crash recovery: Server can resume indexing from last known state
+
 ---
 
 ## Phase 1: Setup (Shared Infrastructure)
@@ -36,7 +42,8 @@
 ### Configuration & Utilities
 
 - [x] T009 Implement Configuration model in src/codeminder/config.py with Pydantic validation
-- [x] T010 [P] Implement structured logging in src/codeminder/utils/logger.py (JSON format, levels, file+stderr)
+- [ ] T009a Implement configuration validation in src/codeminder/config.py (required fields: codebase_path exists, token_limit positive integer 512-8192, concurrency_limit range 1-16, validate model_name format)
+- [x] T010 [P] Implement structured logging in src/codeminder/utils/logger.py (JSON format, levels DEBUG/INFO/WARN/ERROR, configure handlers for both .codeminder/codeminder.log and stderr)
 - [x] T011 [P] Implement error classes with codes in src/codeminder/utils/errors.py (CONFIG_ERROR, PARSE_ERROR, DB_UNAVAILABLE, EMBEDDING_ERROR, WATCHER_ERROR, INDEX_NOT_READY, SEARCH_ERROR)
 
 ### Data Models
@@ -49,6 +56,8 @@
 
 - [x] T015 [P] Implement token counter in src/codeminder/parser/token_counter.py using tiktoken
 - [x] T016 Implement LanceDB connection in src/codeminder/storage/vector_db.py with connect(), create_table(), persistence handling
+- [ ] T016a Add file_registry table creation in src/codeminder/storage/vector_db.py (schema per data-model.md File entity section, persisted to .codeminder/vector_db/file_registry.lance)
+- [ ] T016b Implement file registry CRUD in src/codeminder/storage/vector_db.py (load_file_registry, upsert_file, get_file_by_path, delete_file)
 - [x] T017 Implement sentence-transformers loader in src/codeminder/embeddings/embedder.py with model initialization, device selection (GPU/CPU)
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
@@ -80,23 +89,25 @@
 
 #### Search Logic
 
-- [ ] T034 [US1] Implement search service in src/codeminder/search/searcher.py (query embedding, vector search, result formatting with context paths)
+- [ ] T034 [US1] Implement search service in src/codeminder/search/searcher.py (query embedding, vector search, result formatting per contracts/mcp-tools.md search_code response schema with context paths)
 - [ ] T035 [US1] Add result ranking and filtering in src/codeminder/search/searcher.py (top-k selection, similarity thresholds)
 
 #### Indexing Service
 
 - [ ] T036 [US1] Implement file scanner in src/codeminder/parser/scanner.py (recursive directory traversal, extension filtering, excluded patterns)
-- [ ] T037 [US1] Implement indexing service in src/codeminder/server.py (scan → parse → chunk → embed → store pipeline)
-- [ ] T038 [US1] Add parallel processing in src/codeminder/server.py (asyncio.Semaphore with concurrency_limit)
+- [ ] T037 [US1] Implement indexing service in src/codeminder/server.py (scan → parse → chunk → embed → store pipeline, persist File records)
+- [ ] T037a [US1] Implement startup reconciliation in src/codeminder/server.py (load file_registry from LanceDB → scan filesystem → compare File.last_modified (mtime) vs File.last_indexed per data-model.md → queue changes: INDEX new, REINDEX modified, DELETE removed)
+- [ ] T037b [US1] Add reconciliation action processor in src/codeminder/server.py (INDEX new files, REINDEX modified files, DELETE removed files)
+- [ ] T038 [US1] Add parallel processing in src/codeminder/server.py (asyncio.Semaphore initialized with config.concurrency_limit, wrap file processing in async context manager for rate limiting)
 - [ ] T039 [US1] Add indexing error aggregation and reporting in src/codeminder/server.py (partial success handling)
 
 #### MCP Server
 
-- [ ] T040 [US1] Implement FastMCP server initialization in src/codeminder/server.py (load config, initialize components)
-- [ ] T041 [US1] Implement index_codebase MCP tool in src/codeminder/server.py (trigger indexing, return summary)
+- [ ] T040 [US1] Implement FastMCP server initialization in src/codeminder/server.py (load config, initialize components, run startup reconciliation)
+- [ ] T041 [US1] Implement index_codebase MCP tool in src/codeminder/server.py (trigger indexing, persist File records, return summary)
 - [ ] T042 [US1] Implement search_code MCP tool in src/codeminder/server.py (accept query, return ranked results)
 - [ ] T043 [US1] Add MCP error handling and response formatting in src/codeminder/server.py (structured errors per contracts)
-- [ ] T044 [US1] Add get_index_status MCP tool (optional) in src/codeminder/server.py (diagnostics: file count, chunk count, index size)
+- [ ] T044 [US1] Add get_index_status MCP tool in src/codeminder/server.py (diagnostics: file count, chunk count, registry status, reconciliation info)
 
 **Checkpoint**: User Story 1 complete - MCP server can index Python codebases and perform semantic search
 
@@ -104,7 +115,7 @@
 
 ## Phase 4: User Story 2 - Automatic Index Maintenance (Priority: P1)
 
-**Goal**: Automatically detect file changes and update the index in real-time without manual intervention
+**Goal**: Automatically detect file changes and update the index in real-time without manual intervention (see spec.md User Story 2 for acceptance criteria)
 
 ### Implementation for User Story 2
 
@@ -116,14 +127,14 @@
 
 #### Re-indexing Logic
 
-- [ ] T052 [US2] Implement file deletion handler in src/codeminder/watcher/file_watcher.py (remove File and cascade delete chunks)
-- [ ] T053 [US2] Implement file creation handler in src/codeminder/watcher/file_watcher.py (trigger full indexing for new file)
-- [ ] T054 [US2] Implement file modification handler in src/codeminder/watcher/file_watcher.py (atomic delete+reparse)
-- [ ] T055 [US2] Add re-index coordination in src/codeminder/watcher/file_watcher.py (queue changes, process in parallel with semaphore)
+- [ ] T052 [US2] Implement file deletion handler in src/codeminder/watcher/file_watcher.py (lookup File by absolute_path, cascade delete chunks via vector_db.delete_chunks_by_file_id(), then remove File record from file_registry)
+- [ ] T053 [US2] Implement file creation handler in src/codeminder/watcher/file_watcher.py (create new File record, trigger full indexing)
+- [ ] T054 [US2] Implement file modification handler in src/codeminder/watcher/file_watcher.py (lookup File by path, atomic delete+re-index entire file, update File record timestamps: last_modified, last_indexed)
+- [ ] T055 [US2] Add re-index coordination in src/codeminder/watcher/file_watcher.py (queue changes, process in parallel with semaphore, persist File updates)
 
 #### Search Consistency
 
-- [ ] T056 [US2] Add re-index lock in src/codeminder/storage/vector_db.py (prevent reads during atomic updates)
+- [ ] T056 [US2] Add re-index lock in src/codeminder/storage/vector_db.py (use asyncio.Lock as async context manager to prevent concurrent reads during atomic delete+insert operations)
 - [ ] T057 [US2] Implement atomic transaction for re-indexing in src/codeminder/storage/vector_db.py (delete old + insert new in single operation)
 
 #### Integration
@@ -160,6 +171,7 @@
 
 ### Validation
 
+- [ ] T067 [US1] Implement chunk syntax validation tests in tests/test_chunker.py (parse each generated chunk independently with Tree-sitter, assert 100% validity per SC-002)
 - [ ] T070 Run full quickstart.md walkthrough and fix any issues
 - [ ] T071 Validate all MCP protocol compliance requirements from contracts/mcp-tools.md
 

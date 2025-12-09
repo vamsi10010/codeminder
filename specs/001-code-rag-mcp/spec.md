@@ -96,26 +96,27 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 
 - **FR-001**: System MUST parse code files into Abstract Syntax Trees (AST) to identify logical boundaries such as functions, classes, methods, statements, and expressions
 - **FR-002**: System MUST chunk code at valid AST node boundaries, ensuring each chunk is syntactically valid (can be parsed independently)
-- **FR-003**: System MUST apply adaptive sizing - if a logical unit fits within token limits, index it whole; otherwise recursively descend to child nodes (e.g., split large functions into individual statements or expression blocks)
-- **FR-004**: System MUST tag each code chunk with metadata including file path, line numbers, hierarchical context path (e.g., "File: auth.py > Class: UserAuth > Method: login"), AST node type (e.g., function_definition, if_statement, expression), and chunk sequence number for split nodes
+- **FR-003**: System MUST apply adaptive sizing - if a chunk's source_code fits within token limits (limit applies to code text only, not metadata), index it whole; otherwise recursively descend to child nodes (e.g., split large functions into individual statements or expression blocks)
+- **FR-004**: System MUST tag each code chunk with metadata including file path, line numbers, context path in format `filename:start_line-end_line` (see data-model.md for specification), AST node type (e.g., function_definition, if_statement, expression), and chunk sequence number for split nodes
 - **FR-005**: System MUST embed code chunks into vector representations using a semantic embedding model suitable for code
 - **FR-006**: System MUST store embeddings in a vector database that supports similarity search, operating in-memory with optional disk persistence to avoid full re-indexing on restart
 - **FR-007**: System MUST expose an MCP-compliant server interface following the Model Context Protocol specification
 - **FR-007a**: System MUST read configuration from a file (e.g., .codeminder.json) specifying the codebase path to index, token limits, persistence settings, and parallel processing concurrency limit
-- **FR-007b**: System MUST provide an MCP tool named `index_codebase` that triggers initial indexing of the configured codebase directory
+- **FR-007a-1**: System MUST persist File metadata to `.codeminder/vector_db/file_registry.lance` and validate path accessibility on startup
+- **FR-007b**: System MUST provide an MCP tool named `index_codebase` that triggers initial indexing of the configured codebase directory. If indexing is already in progress, return error with code INDEX_IN_PROGRESS and estimated completion time
 - **FR-008**: System MUST provide a callable MCP tool named `search_code` that accepts natural language queries
 - **FR-009**: System MUST return search results formatted for LLM consumption including code snippet, file path, line numbers, and context path
-- **FR-009a**: System MUST return structured error objects containing error code, human-readable message, and contextual details (e.g., file path, line number) when errors occur
+- **FR-009a**: System MUST return structured error objects containing error code, human-readable message, and context object with fields: file_path (optional string), line_number (optional int), details (optional dict with additional error-specific data) when errors occur
 - **FR-010**: System MUST rank search results by semantic similarity (vector distance) with most relevant results first
-- **FR-011**: System MUST support Python code parsing and indexing as the primary language
-- **FR-011a**: System MUST implement structured logging with configurable levels (DEBUG, INFO, WARN, ERROR) output to both log file and stderr for debugging and monitoring
-- **FR-012**: System MUST implement a background file watcher that monitors the codebase directory for changes
+- **FR-011**: System MUST support Python code parsing and indexing as the sole language in Phase 1 using Tree-sitter with Python grammar (architecture supports future multi-language expansion in Phase 2)
+- **FR-011a**: System MUST implement structured logging with configurable levels (DEBUG, INFO, WARN, ERROR) output to both log file (.codeminder/codeminder.log) and stderr for debugging and monitoring. Event levels: DEBUG (token counts, chunk creation details), INFO (file indexed, search queries), WARN (parse fallback, performance degradation), ERROR (indexing failures, search errors, watcher errors)
+- **FR-012**: System MUST implement a background file watcher that monitors the codebase directory for changes. Symlinks within the codebase directory are followed and monitored; symlinks pointing outside codebase_path are ignored
 - **FR-013**: System MUST automatically re-parse and re-index files when they are modified and saved by deleting all old chunks for that file and re-parsing the entire file atomically (no partial updates visible to search)
 - **FR-014**: System MUST remove index entries for deleted files
 - **FR-015**: System MUST add index entries for newly created files
-- **FR-016**: System MUST complete re-indexing of changed files within 5 seconds of detecting the change
+- **FR-016**: System MUST complete re-indexing of changed files within 5 seconds total from file save event (including 500ms debounce delay for processing time)
 - **FR-016a**: System MUST ensure search requests during file re-indexing wait for atomic completion of the update before returning results to maintain consistency
-- **FR-016b**: System MUST debounce file change events with a 500ms delay to avoid thrashing when files are modified in rapid succession (e.g., auto-save)
+- **FR-016b**: System MUST debounce file change events with a 500ms per-file delay (resets on each change to the same file) to avoid thrashing when files are modified in rapid succession (e.g., auto-save)
 - **FR-016c**: System MUST support parallel processing of multiple file changes with configurable concurrency limit (default 4 files, range 1-16) to handle batch operations like git branch switches efficiently
 
 #### Phase 2: Enhanced Retrieval (Future)
@@ -161,7 +162,7 @@ A codebase contains multiple programming languages (Python, JavaScript, TypeScri
 
 #### Phase 2 Success Criteria
 
-- **SC-007**: File changes are reflected in search results within 5 seconds of saving the file (including 500ms debounce delay)
+- **SC-007**: File changes are reflected in search results within 5 seconds total from file save event (including 500ms debounce delay for 4.5s processing time)
 - **SC-008**: The file watcher operates continuously for 8+ hours without memory leaks or performance degradation
 - **SC-009**: Multi-language indexing supports at least Python, JavaScript, and TypeScript with language-appropriate AST parsing
 

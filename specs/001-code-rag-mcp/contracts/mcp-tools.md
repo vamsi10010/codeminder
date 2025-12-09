@@ -91,12 +91,23 @@ Triggers initial indexing of the configured codebase directory.
 
 ### Behavior
 
+**First-time indexing** (no existing LanceDB):
 - Scans `codebase_path` recursively for code files
 - Skips files matching `excluded_patterns` (.pyc, __pycache__, .git, etc.)
 - Processes files in parallel up to `concurrency_limit`
 - Creates `File`, `CodeChunk`, and `Embedding` records
+- Persists File metadata to `file_registry` table in LanceDB
 - Returns summary with counts and any non-fatal errors
-- If LanceDB persistence is enabled, index survives server restart
+
+**Subsequent runs** (existing LanceDB):
+- Automatically runs **startup reconciliation** on server initialization:
+  1. Loads File registry from LanceDB
+  2. Scans filesystem to detect changes
+  3. Compares filesystem mtime vs `last_indexed` timestamp
+  4. Re-indexes only modified/new files, deletes removed files
+  5. Updates File records with new timestamps
+- Manual `index_codebase` call forces full re-scan (useful for debugging)
+- Index survives server restarts via LanceDB persistence
 
 ### Performance
 
@@ -263,6 +274,18 @@ Returns current indexing status and statistics.
     "total_lines_of_code": 45230,
     "index_size_mb": 87.3,
     "last_indexed": "2025-12-07T10:30:45Z"
+  },
+  "registry": {
+    "persisted": true,
+    "files_in_registry": 142,
+    "registry_table_size_mb": 2.1,
+    "last_reconciliation": "2025-12-07T09:15:22Z"
+  },
+  "reconciliation": {
+    "startup_scan_completed": true,
+    "files_reindexed_on_startup": 3,
+    "files_deleted_on_startup": 1,
+    "new_files_indexed": 0
   },
   "file_watcher": {
     "enabled": true,

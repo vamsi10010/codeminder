@@ -29,9 +29,16 @@
 - tiktoken (token counting for adaptive chunking)
 
 **Storage**: 
-- Vector embeddings: LanceDB (in-memory with optional disk persistence to `.codeminder/` directory)
-- Configuration: JSON file (`.codeminder.json` in codebase root)
-- Logs: Structured logs to file (`.codeminder/codeminder.log`) and stderr
+- **File registry**: LanceDB `file_registry` table (persisted, enables startup reconciliation)
+- **Vector embeddings**: LanceDB `code_chunks` table (persisted to `.codeminder/vector_db/`)
+- **Configuration**: JSON file (`.codeminder.json` in codebase root)
+- **Logs**: Structured logs to file (`.codeminder/codeminder.log`) and stderr
+
+**Startup Behavior**:
+1. Load file registry from LanceDB (contains File metadata: paths, timestamps, parse status)
+2. Scan filesystem to detect new/modified/deleted files
+3. Reconcile: Re-index only files changed since `last_indexed` timestamp (compare mtime vs last_indexed). For files with same path but newer mtime, verify file_id matches; if different, treat as DELETE+CREATE to handle file replacement scenario
+4. Start file watcher for ongoing changes
 
 
 
@@ -134,6 +141,8 @@ codeminder/                          # Repository root
 │           └── errors.py            # Custom error classes with codes
 ├── .codeminder/                     # Runtime data directory (gitignored)
 │   ├── vector_db/                   # LanceDB persistent storage
+│   │   ├── file_registry.lance      # File metadata table (NEW: persisted)
+│   │   └── code_chunks.lance        # Code chunks + embeddings table
 │   └── codeminder.log               # Structured log file
 └── .specify/                        # Project specifications
     └── specs/001-code-rag-mcp/
@@ -142,12 +151,18 @@ codeminder/                          # Repository root
 **Structure Decision**: Single Python project using `src/` layout for proper packaging. Modular design with clear separation of concerns:
 - `parser/`: AST parsing and chunking (Tree-sitter)
 - `embeddings/`: Code embedding generation (Jina)
-- `storage/`: Vector database operations (LanceDB)
+- `storage/`: Vector database operations (LanceDB) - **Now includes file_registry table for File persistence**
 - `search/`: Semantic search and ranking
 - `watcher/`: File system monitoring (Watchfiles)
-- `server.py`: MCP server entry point (FastMCP)
+- `server.py`: MCP server entry point (FastMCP) - **Includes startup reconciliation logic**
 - `config.py`: Configuration management
 - `utils/`: Cross-cutting concerns (logging, errors)
+
+**Key Architecture Changes**:
+- **File Registry Persistence**: File metadata now persisted in LanceDB `file_registry` table
+- **Startup Reconciliation**: Server compares persisted registry with filesystem on startup
+- **Efficient Re-indexing**: Only files modified since `last_indexed` are re-parsed
+- **Fast Lookups**: File records indexed by `absolute_path` for O(1) lookups during file changes
 
 ## Complexity Tracking
 

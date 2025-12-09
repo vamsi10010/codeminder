@@ -82,10 +82,25 @@ python -m codeminder.server
 python -m codeminder.server --config /path/to/.codeminder.json
 ```
 
-**Output**:
+**Output** (first run):
 ```
 [INFO] CodeMinder MCP Server v0.1.0
 [INFO] Configuration loaded from .codeminder.json
+[INFO] Connected to LanceDB at .codeminder/vector_db
+[INFO] No existing file registry found, will index from scratch
+[INFO] File watcher started: /home/user/project
+[INFO] MCP server listening on stdio
+```
+
+**Output** (subsequent runs with existing index):
+```
+[INFO] CodeMinder MCP Server v0.1.0
+[INFO] Configuration loaded from .codeminder.json
+[INFO] Connected to LanceDB at .codeminder/vector_db
+[INFO] Loaded file registry with 142 files
+[INFO] Startup reconciliation: 3 files modified, 1 deleted, 0 new
+[INFO] Re-indexing 3 modified files...
+[INFO] Reconciliation complete in 4.2 seconds
 [INFO] File watcher started: /home/user/project
 [INFO] MCP server listening on stdio
 ```
@@ -121,11 +136,15 @@ Restart Claude Desktop to load the configuration.
 
 ### 1. Index Your Codebase
 
-First time only: Build the initial index.
+**First Run**: Server automatically performs startup reconciliation and indexes all files.
+
+**Subsequent Runs**: Server loads existing file registry and only re-indexes changed files.
+
+**Manual Re-index** (optional, for debugging):
 
 **In Claude/AI Assistant**:
 ```
-Use the index_codebase tool to index my codebase.
+Use the index_codebase tool to force a full re-index of my codebase.
 ```
 
 **Response**:
@@ -140,14 +159,23 @@ Use the index_codebase tool to index my codebase.
 }
 ```
 
-**What happens**:
+**What happens on first run**:
 - Downloads embedding model on first run (~1GB, cached to `~/.cache/huggingface/`)
 - Scans codebase for Python files (.py)
 - Parses each file into AST (Abstract Syntax Tree)
 - Chunks code at logical boundaries (functions, classes, methods)
 - Generates embeddings locally using sentence-transformers
-- Stores in LanceDB (`.codeminder/vector_db/`)
+- **Persists File registry to LanceDB** (tracks which files indexed and when)
+- Stores code chunks + embeddings in LanceDB (`.codeminder/vector_db/`)
 - Starts file watcher for automatic updates
+
+**What happens on subsequent startups**:
+- Loads File registry from LanceDB
+- Compares filesystem mtime vs `last_indexed` for each file
+- **Only re-indexes files that changed while server was down**
+- Deletes records for files that were removed
+- Adds new files discovered on filesystem
+- Much faster than full re-index (typically 2-5 seconds for small changes)
 
 ### 2. Search for Code
 
