@@ -22,9 +22,7 @@ class Chunker:
         file.chunk_count = len(chunks)
         return sorted(chunks, key=lambda c: c.start_line)
 
-    def _chunk_with_cursor(
-        self, tree: Tree, file: File, cursor, chunks: list[CodeChunk]
-    ) -> None:
+    def _chunk_with_cursor(self, tree: Tree, file: File, cursor, chunks: list[CodeChunk]) -> None:
         """Recursively chunk using TreeCursor for efficient traversal."""
         node = cursor.node
 

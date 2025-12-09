@@ -35,9 +35,7 @@ class VectorDB:
             else:
                 self._db = lancedb.connect(":memory:")
 
-            logger.info(
-                f"Connected to LanceDB at {self.db_path if self.persist else 'memory'}"
-            )
+            logger.info(f"Connected to LanceDB at {self.db_path if self.persist else 'memory'}")
         except Exception as e:
             raise DBUnavailableError(
                 f"Failed to connect to database: {str(e)}", {"db_path": self.db_path}
@@ -90,9 +88,7 @@ class VectorDB:
                 f"Failed to insert chunks: {str(e)}", {"chunk_count": len(chunks)}
             ) from e
 
-    async def atomic_reindex_file(
-        self, file_id: UUID, new_chunks: list[dict[str, Any]]
-    ) -> None:
+    async def atomic_reindex_file(self, file_id: UUID, new_chunks: list[dict[str, Any]]) -> None:
         """Atomically delete old chunks and insert new chunks for a file.
 
         Args:
@@ -105,8 +101,7 @@ class VectorDB:
                 if new_chunks:
                     self.insert_chunks(new_chunks)
                 logger.info(
-                    f"Atomically re-indexed file {file_id}: "
-                    f"inserted {len(new_chunks)} new chunks"
+                    f"Atomically re-indexed file {file_id}: inserted {len(new_chunks)} new chunks"
                 )
             except Exception as e:
                 raise DBUnavailableError(
@@ -135,16 +130,12 @@ class VectorDB:
 
         try:
             results = (
-                self._table.search(query_vector, vector_column_name="vector")
-                .limit(limit)
-                .to_list()
+                self._table.search(query_vector, vector_column_name="vector").limit(limit).to_list()
             )
             logger.info(f"Search returned {len(results)} results")
             return results
         except Exception as e:
-            raise DBUnavailableError(
-                f"Failed to search: {str(e)}", {"limit": limit}
-            ) from e
+            raise DBUnavailableError(f"Failed to search: {str(e)}", {"limit": limit}) from e
 
     def delete_by_file_id(self, file_id: UUID) -> None:
         if self._table is None:
@@ -166,9 +157,7 @@ class VectorDB:
             count = self._table.count_rows()
             return {
                 "total_chunks": count,
-                "table_name": (
-                    self._table.name if hasattr(self._table, "name") else "code_chunks"
-                ),
+                "table_name": (self._table.name if hasattr(self._table, "name") else "code_chunks"),
             }
         except Exception as e:
             raise DBUnavailableError(f"Failed to get stats: {str(e)}") from e
@@ -196,9 +185,7 @@ class VectorDB:
                 # Table will be created on first upsert
                 logger.info("File registry table will be created on first file insert")
         except Exception as e:
-            raise DBUnavailableError(
-                f"Failed to open file_registry table: {str(e)}"
-            ) from e
+            raise DBUnavailableError(f"Failed to open file_registry table: {str(e)}") from e
 
     def load_file_registry(self) -> list[File]:
         """Load all File records from the file_registry table.
@@ -260,9 +247,7 @@ class VectorDB:
             if self._file_registry_table is None:
                 if self._db is None:
                     raise DBUnavailableError("Database not connected")
-                self._file_registry_table = self._db.create_table(
-                    "file_registry", file_data
-                )
+                self._file_registry_table = self._db.create_table("file_registry", file_data)
                 logger.info("Created new file_registry table")
             else:
                 # Delete existing record if it exists
@@ -309,9 +294,7 @@ class VectorDB:
                 last_modified=datetime.fromisoformat(record["last_modified"]),
                 last_indexed=datetime.fromisoformat(record["last_indexed"]),
                 parse_status=ParseStatus(record["parse_status"]),
-                error_message=(
-                    record["error_message"] if record["error_message"] else None
-                ),
+                error_message=(record["error_message"] if record["error_message"] else None),
                 chunk_count=record["chunk_count"],
             )
         except Exception as e:

@@ -9,6 +9,7 @@ from typing import Any
 
 from .config import Configuration
 from .embeddings.embedder import Embedder
+from .parser.ast_parser import ASTParser
 from .parser.chunker import Chunker
 from .parser.scanner import FileScanner
 from .storage.models import File, ParseStatus
@@ -94,12 +95,12 @@ class IndexingService:
 
         self.embedder.load_model()
 
-        await self._startup_reconciliation()
+        await self._reconcile_index()
 
         self._is_ready = True
         logger.info("IndexingService initialized and ready")
 
-    async def _startup_reconciliation(self) -> None:
+    async def _reconcile_index(self) -> dict[str, Any]:
         """Reconcile persisted file registry with current filesystem state.
 
         Steps:
@@ -108,8 +109,11 @@ class IndexingService:
         3. Compare timestamps and paths
         4. Generate reconciliation actions (INDEX, REINDEX, DELETE)
         5. Process actions in parallel
+
+        Returns:
+            Summary dictionary with statistics about reconciliation actions.
         """
-        logger.info("Starting startup reconciliation...")
+        logger.info("Starting index reconciliation...")
         start_time = time.time()
 
         # Load persisted file registry
@@ -121,6 +125,18 @@ class IndexingService:
         discovered_paths = self.scanner.scan()
         discovered_path_set = {str(p) for p in discovered_paths}
         logger.info(f"Discovered {len(discovered_paths)} files in filesystem")
+
+        if len(discovered_paths) == 0:
+            logger.warning("No files found to index")
+            return {
+                "status": "success",
+                "summary": {
+                    "files_indexed": 0,
+                    "chunks_created": 0,
+                    "duration_seconds": 0.0,
+                    "errors": [],
+                },
+            }
 
         # Generate reconciliation actions
         actions: list[tuple[ReconciliationAction, Path | File]] = []
@@ -146,27 +162,96 @@ class IndexingService:
                 # File no longer exists - delete from index
                 actions.append((ReconciliationAction.DELETE, file))
 
+        new_count = sum(1 for a, _ in actions if a == ReconciliationAction.INDEX)
+        modified_count = sum(1 for a, _ in actions if a == ReconciliationAction.REINDEX)
+        deleted_count = sum(1 for a, _ in actions if a == ReconciliationAction.DELETE)
+
         logger.info(
-            f"Reconciliation actions: "
-            f"{sum(1 for a, _ in actions if a == ReconciliationAction.INDEX)} new, "
-            f"{sum(1 for a, _ in actions if a == ReconciliationAction.REINDEX)} modified, "
-            f"{sum(1 for a, _ in actions if a == ReconciliationAction.DELETE)} deleted"
+            f"Reconciliation actions: {new_count} new, {modified_count} modified, {deleted_count} deleted"
         )
 
         # Process reconciliation actions
+        errors: list[IndexingError] = []
+        files_indexed = 0
+        total_chunks = 0
+        files_failed = 0
+
         if actions:
-            await self._process_reconciliation_actions(actions)
+            results = await self._process_reconciliation_actions(actions)
+
+            # Aggregate results
+            for result in results:
+                if isinstance(result, Exception):
+                    files_failed += 1
+                    error_str = str(result)
+                    file_path = "unknown"
+                    if isinstance(result, ParseError) and "file" in result.details:
+                        file_path = result.details["file"]
+
+                    errors.append(
+                        IndexingError(
+                            file_path=file_path,
+                            error_code="PARSE_ERROR",
+                            message=error_str,
+                            recovery="Fix syntax errors or exclude file from indexing",
+                        )
+                    )
+                elif isinstance(result, File):
+                    if result.parse_status == ParseStatus.SUCCESS:
+                        files_indexed += 1
+                        total_chunks += result.chunk_count
+                    else:
+                        files_failed += 1
+                        errors.append(
+                            IndexingError(
+                                file_path=result.relative_path,
+                                error_code=result.parse_status.value,
+                                message=result.error_message or "Unknown error",
+                                recovery="Check file syntax and format",
+                            )
+                        )
+                elif result is None:
+                    # DELETE actions return None
+                    pass
 
         duration = time.time() - start_time
-        logger.info(f"Startup reconciliation completed in {duration:.2f}s")
+        logger.info(
+            f"Reconciliation completed: {files_indexed} files indexed, "
+            f"{total_chunks} chunks, {deleted_count} files deleted, "
+            f"{files_failed} errors in {duration:.2f}s"
+        )
+
+        # Prepare response
+        status = "success" if files_failed == 0 else "partial_success"
+        summary = {
+            "files_indexed": files_indexed,
+            "chunks_created": total_chunks,
+            "duration_seconds": round(duration, 2),
+            "errors": [e.to_dict() for e in errors],
+        }
+
+        if files_failed > 0:
+            summary["files_failed"] = files_failed
+
+        return {
+            "status": status,
+            "summary": summary,
+            "details": {
+                "codebase_path": self.config.codebase_path,
+                "languages": {"python": files_indexed},
+            },
+        }
 
     async def _process_reconciliation_actions(
         self, actions: list[tuple[ReconciliationAction, Path | File]]
-    ) -> None:
+    ) -> list[Any]:
         """Process reconciliation actions in parallel.
 
         Args:
             actions: List of (action, file_or_path) tuples.
+
+        Returns:
+            List of results (File objects, None for deletes, or Exceptions).
         """
         tasks = []
         for action, target in actions:
@@ -187,6 +272,8 @@ class IndexingService:
         for result in results:
             if isinstance(result, Exception):
                 logger.error(f"Reconciliation action failed: {result}")
+
+        return results
 
     async def _index_file_async(self, file_path: Path) -> File:
         """Index a single file asynchronously with semaphore control.
@@ -317,9 +404,7 @@ class IndexingService:
             file.chunk_count = len(chunks)
             self.vector_db.upsert_file(file)
 
-            logger.info(
-                f"Successfully re-indexed {file.relative_path}: {len(chunks)} chunks"
-            )
+            logger.info(f"Successfully re-indexed {file.relative_path}: {len(chunks)} chunks")
             return file
 
         except Exception as e:
@@ -364,9 +449,11 @@ class IndexingService:
             raise
 
     async def index_codebase(self) -> dict[str, Any]:
-        """Index the entire codebase.
+        """Index the entire codebase using reconciliation.
 
-        This is the main entry point for initial indexing or full re-indexing.
+        This is the main entry point for indexing. It uses the reconciliation
+        logic to intelligently handle new, modified, and deleted files instead
+        of blindly re-indexing everything.
 
         Returns:
             Summary of indexing results with counts and errors.
@@ -375,95 +462,11 @@ class IndexingService:
             raise IndexNotReadyError("Indexing already in progress")
 
         self._indexing_in_progress = True
-        start_time = time.time()
-        logger.info("Starting codebase indexing...")
+        logger.info("Starting codebase indexing via reconciliation...")
 
         try:
-            # Scan for all files
-            file_paths = self.scanner.scan()
-            total_files = len(file_paths)
-
-            if total_files == 0:
-                logger.warning("No files found to index")
-                return {
-                    "status": "success",
-                    "summary": {
-                        "files_indexed": 0,
-                        "chunks_created": 0,
-                        "duration_seconds": 0.0,
-                        "errors": [],
-                    },
-                }
-
-            # Index files in parallel
-            errors: list[IndexingError] = []
-            tasks = [self._index_file_async(path) for path in file_paths]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Aggregate results
-            files_indexed = 0
-            files_failed = 0
-            total_chunks = 0
-
-            for result in results:
-                if isinstance(result, Exception):
-                    files_failed += 1
-                    error_str = str(result)
-                    # Extract file path from error if possible
-                    file_path = "unknown"
-                    if isinstance(result, ParseError) and "file" in result.details:
-                        file_path = result.details["file"]
-
-                    errors.append(
-                        IndexingError(
-                            file_path=file_path,
-                            error_code="PARSE_ERROR",
-                            message=error_str,
-                            recovery="Fix syntax errors or exclude file from indexing",
-                        )
-                    )
-                elif isinstance(result, File):
-                    if result.parse_status == ParseStatus.SUCCESS:
-                        files_indexed += 1
-                        total_chunks += result.chunk_count
-                    else:
-                        files_failed += 1
-                        errors.append(
-                            IndexingError(
-                                file_path=result.relative_path,
-                                error_code=result.parse_status.value,
-                                message=result.error_message or "Unknown error",
-                                recovery="Check file syntax and format",
-                            )
-                        )
-
-            duration = time.time() - start_time
-
-            # Prepare response
-            status = "success" if files_failed == 0 else "partial_success"
-            summary = {
-                "files_indexed": files_indexed,
-                "chunks_created": total_chunks,
-                "duration_seconds": round(duration, 2),
-                "errors": [e.to_dict() for e in errors],
-            }
-
-            if files_failed > 0:
-                summary["files_failed"] = files_failed
-
-            logger.info(
-                f"Indexing completed: {files_indexed} files, "
-                f"{total_chunks} chunks, {files_failed} errors in {duration:.2f}s"
-            )
-
-            return {
-                "status": status,
-                "summary": summary,
-                "details": {
-                    "codebase_path": self.config.codebase_path,
-                    "languages": {"python": files_indexed},
-                },
-            }
+            result = await self._reconcile_index()
+            return result
 
         finally:
             self._indexing_in_progress = False
@@ -477,11 +480,7 @@ class IndexingService:
         Returns:
             Language name (e.g., "python").
         """
-        extension_map = {
-            ".py": "python",
-            # Phase 2: Add more languages
-        }
-        return extension_map.get(file_path.suffix, "unknown")
+        return ASTParser.detect_language(file_path)
 
     def _chunk_to_dict(self, chunk: Any, file: File) -> dict[str, Any]:
         """Convert CodeChunk to dictionary for storage.

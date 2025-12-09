@@ -1,4 +1,3 @@
-
 import tiktoken
 
 _encoding: tiktoken.Encoding | None = None

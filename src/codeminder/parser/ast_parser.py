@@ -1,9 +1,10 @@
 """AST parser using Tree-sitter for multi-language code parsing."""
 
-from typing import Tuple, cast
+from typing import cast
 from pathlib import Path
 from tree_sitter import Tree
 from tree_sitter_language_pack import get_parser, SupportedLanguage
+
 
 class ASTParser:
     """Parse source code files into AST using Tree-sitter."""
@@ -14,13 +15,13 @@ class ASTParser:
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
         source_bytes = file_path.read_bytes()
-        language_name = cls._detect_language(file_path)
+        language_name = cast(SupportedLanguage, cls.detect_language(file_path))
         parser = get_parser(language_name)
         tree = parser.parse(source_bytes)
         return tree
 
     @classmethod
-    def _detect_language(cls, file_path: Path | str) -> SupportedLanguage:
+    def detect_language(cls, file_path: Path | str) -> str:
         extension_map = {
             ".py": "python",
             ".js": "javascript",
@@ -62,6 +63,4 @@ class ASTParser:
         if suffix not in extension_map:
             raise ValueError(f"Unsupported file extension: {suffix}")
 
-        language_name = cast(SupportedLanguage, extension_map[suffix])
-
-        return language_name
+        return extension_map[suffix]

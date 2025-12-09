@@ -33,9 +33,7 @@ async def _ensure_initialized() -> None:
     _indexing_service = IndexingService(config)
     await _indexing_service.initialize()
 
-    _searcher = Searcher(
-        vector_db=_indexing_service.vector_db, embedder=_indexing_service.embedder
-    )
+    _searcher = Searcher(vector_db=_indexing_service.vector_db, embedder=_indexing_service.embedder)
 
     logger.info("CodeMinder MCP server initialized successfully")
 

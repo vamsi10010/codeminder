@@ -81,9 +81,7 @@ class Searcher:
             total_chunks = stats.get("total_chunks", 0)
 
             if total_chunks == 0:
-                raise IndexNotReadyError(
-                    "Codebase has not been indexed yet", {"indexed_files": 0}
-                )
+                raise IndexNotReadyError("Codebase has not been indexed yet", {"indexed_files": 0})
 
             logger.info(f"Searching for: {query[:100]}...")
 
