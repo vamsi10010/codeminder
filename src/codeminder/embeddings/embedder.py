@@ -1,3 +1,5 @@
+import time
+from typing import Any
 
 import torch
 from sentence_transformers import SentenceTransformer
@@ -44,29 +46,52 @@ class Embedder:
             ) from e
 
     def encode(
-        self, texts: list[str], batch_size: int = 32, show_progress: bool = False
+        self,
+        texts: list[str],
+        batch_size: int = 32,
+        show_progress: bool = False,
+        max_retries: int = 3,
     ) -> list[list[float]]:
         if not self._model:
             raise EmbeddingError("Model not loaded. Call load_model() first.")
 
-        try:
-            embeddings = self._model.encode(
-                texts,
-                batch_size=batch_size,
-                show_progress_bar=show_progress,
-                convert_to_numpy=True,
-            )
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                embeddings = self._model.encode(
+                    texts,
+                    batch_size=batch_size,
+                    show_progress_bar=show_progress,
+                    convert_to_numpy=True,
+                )
 
-            logger.info(f"Encoded {len(texts)} texts into embeddings")
-            return embeddings.tolist()
-        except Exception as e:
-            raise EmbeddingError(
-                f"Failed to encode texts: {str(e)}",
-                {"text_count": len(texts), "batch_size": batch_size},
-            ) from e
+                logger.info(f"Encoded {len(texts)} texts into embeddings")
+                return embeddings.tolist()
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    wait_time = 2**attempt
+                    logger.warning(
+                        f"Encoding attempt {attempt + 1}/{max_retries} failed: {str(e)}. "
+                        f"Retrying in {wait_time}s..."
+                    )
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"All {max_retries} encoding attempts failed")
+
+        raise EmbeddingError(
+            f"Failed to encode texts after {max_retries} attempts: {str(last_error)}",
+            {"text_count": len(texts), "batch_size": batch_size},
+        ) from last_error
 
     def encode_single(self, text: str) -> list[float]:
         return self.encode([text], batch_size=1)[0]
+
+    def encode_chunks(
+        self, chunks: list[dict[str, Any]], show_progress: bool = False
+    ) -> list[list[float]]:
+        texts = [chunk["source_code"] for chunk in chunks]
+        return self.encode(texts, show_progress=show_progress)
 
     def get_dimension(self) -> int | None:
         if not self._model:

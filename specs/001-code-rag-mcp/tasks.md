@@ -78,19 +78,19 @@
 
 #### Embedding Generation
 
-- [ ] T029 [US1] Implement batch embedding in src/codeminder/embeddings/embedder.py (encode chunks, handle context+code, progress tracking)
-- [ ] T030 [US1] Add embedding error handling and retry logic in src/codeminder/embeddings/embedder.py
+- [X] T029 [US1] Implement batch embedding in src/codeminder/embeddings/embedder.py (encode chunks, handle context+code, progress tracking)
+- [X] T030 [US1] Add embedding error handling and retry logic in src/codeminder/embeddings/embedder.py
 
 #### Vector Storage
 
-- [ ] T031 [US1] Implement chunk storage in src/codeminder/storage/vector_db.py (insert chunks with embeddings, handle duplicates)
-- [ ] T032 [US1] Implement similarity search in src/codeminder/storage/vector_db.py (ANN search, cosine similarity, result ranking)
-- [ ] T033 [US1] Implement chunk deletion in src/codeminder/storage/vector_db.py (delete by file_id, atomic operations)
+- [X] T031 [US1] Implement chunk storage in src/codeminder/storage/vector_db.py (insert chunks with embeddings, handle duplicates)
+- [X] T032 [US1] Implement similarity search in src/codeminder/storage/vector_db.py (ANN search, cosine similarity, result ranking)
+- [X] T033 [US1] Implement chunk deletion in src/codeminder/storage/vector_db.py (delete by file_id, atomic operations)
 
 #### Search Logic
 
-- [ ] T034 [US1] Implement search service in src/codeminder/search/searcher.py (query embedding, vector search, result formatting per contracts/mcp-tools.md search_code response schema with context paths)
-- [ ] T035 [US1] Add result ranking and filtering in src/codeminder/search/searcher.py (top-k selection, similarity thresholds)
+- [X] T034 [US1] Implement search service in src/codeminder/search/searcher.py (query embedding, vector search, result formatting per contracts/mcp-tools.md search_code response schema with context paths)
+- [X] T035 [US1] Add result ranking and filtering in src/codeminder/search/searcher.py (top-k selection, similarity thresholds)
 
 #### Indexing Service
 

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ class VectorDB:
         self._db: DBConnection | None = None
         self._table: Table | None = None
         self._file_registry_table: Table | None = None
+        self._reindex_lock = asyncio.Lock()
 
     def connect(self) -> None:
         try:
@@ -84,6 +86,10 @@ class VectorDB:
         if not self._table:
             raise DBUnavailableError("Table not initialized")
 
+        if not chunks:
+            logger.debug("No chunks to insert")
+            return
+
         try:
             self._table.add(chunks)
             logger.info(f"Inserted {len(chunks)} chunks into vector DB")
@@ -92,14 +98,55 @@ class VectorDB:
                 f"Failed to insert chunks: {str(e)}", {"chunk_count": len(chunks)}
             ) from e
 
+    async def atomic_reindex_file(
+        self, file_id: UUID, new_chunks: list[dict[str, Any]]
+    ) -> None:
+        """Atomically delete old chunks and insert new chunks for a file.
+
+        Args:
+            file_id: UUID of the file being re-indexed.
+            new_chunks: New chunks with embeddings to insert.
+        """
+        async with self._reindex_lock:
+            try:
+                self.delete_by_file_id(file_id)
+                if new_chunks:
+                    self.insert_chunks(new_chunks)
+                logger.info(
+                    f"Atomically re-indexed file {file_id}: "
+                    f"inserted {len(new_chunks)} new chunks"
+                )
+            except Exception as e:
+                raise DBUnavailableError(
+                    f"Failed to atomically re-index file: {str(e)}",
+                    {"file_id": str(file_id)},
+                ) from e
+
     def search(
-        self, query_vector: list[float], limit: int = 20
+        self,
+        query_vector: list[float],
+        limit: int = 20,
     ) -> list[dict[str, Any]]:
+        """Search for similar code chunks using vector similarity.
+
+        Uses cosine similarity (default) for semantic code search.
+
+        Args:
+            query_vector: Embedding vector to search for.
+            limit: Maximum number of results to return.
+
+        Returns:
+            List of chunk records with similarity scores and _distance field.
+        """
         if not self._table:
             raise DBUnavailableError("Table not initialized")
 
         try:
-            results = self._table.search(query_vector).limit(limit).to_list()
+            results = (
+                self._table.search(query_vector, vector_column_name="vector")
+                .limit(limit)
+                .to_list()
+            )
             logger.info(f"Search returned {len(results)} results")
             return results
         except Exception as e:
@@ -166,13 +213,13 @@ class VectorDB:
             table_name = "file_registry"
             if table_name in self._db.table_names():
                 self._file_registry_table = self._db.open_table(table_name)
-                logger.info(f"Opened existing file_registry table")
+                logger.info("Opened existing file_registry table")
             else:
                 empty_data = pa.Table.from_pylist([], schema=schema)
                 self._file_registry_table = self._db.create_table(
                     table_name, empty_data
                 )
-                logger.info(f"Created new file_registry table")
+                logger.info("Created new file_registry table")
         except Exception as e:
             raise DBUnavailableError(
                 f"Failed to create/open file_registry table: {str(e)}"
