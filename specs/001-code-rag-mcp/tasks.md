@@ -56,8 +56,8 @@
 
 - [x] T015 [P] Implement token counter in src/codeminder/parser/token_counter.py using tiktoken
 - [x] T016 Implement LanceDB connection in src/codeminder/storage/vector_db.py with connect(), create_table(), persistence handling
-- [ ] T016a Add file_registry table creation in src/codeminder/storage/vector_db.py (schema per data-model.md File entity section, persisted to .codeminder/vector_db/file_registry.lance)
-- [ ] T016b Implement file registry CRUD in src/codeminder/storage/vector_db.py (load_file_registry, upsert_file, get_file_by_path, delete_file)
+- [x] T016a Add file_registry table creation in src/codeminder/storage/vector_db.py (schema per data-model.md File entity section, persisted to .codeminder/vector_db/file_registry.lance)
+- [x] T016b Implement file registry CRUD in src/codeminder/storage/vector_db.py (load_file_registry, upsert_file, get_file_by_path, delete_file)
 - [x] T017 Implement sentence-transformers loader in src/codeminder/embeddings/embedder.py with model initialization, device selection (GPU/CPU)
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
