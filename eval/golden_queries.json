@@ -1,0 +1,14 @@
+[
+  {
+    "query": "validate jwt token",
+    "relevant_paths": ["auth.py"]
+  },
+  {
+    "query": "multiply two numbers",
+    "relevant_paths": ["calc.py"]
+  },
+  {
+    "query": "connect to database",
+    "relevant_paths": ["db.py"]
+  }
+]
