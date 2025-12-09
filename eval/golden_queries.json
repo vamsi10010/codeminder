@@ -1,0 +1,26 @@
+[
+  {
+    "query": "verify a signed jwt token",
+    "relevant_paths": ["auth.py"]
+  },
+  {
+    "query": "encode a token payload to jwt",
+    "relevant_paths": ["auth.py"]
+  },
+  {
+    "query": "multiply two integers using repeated addition",
+    "relevant_paths": ["calc.py"]
+  },
+  {
+    "query": "simple function to add numbers",
+    "relevant_paths": ["calc.py"]
+  },
+  {
+    "query": "open a sqlite database connection",
+    "relevant_paths": ["db.py"]
+  },
+  {
+    "query": "configure sqlite with wal mode",
+    "relevant_paths": ["db.py"]
+  }
+]
