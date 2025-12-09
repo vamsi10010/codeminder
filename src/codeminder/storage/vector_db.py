@@ -22,6 +22,7 @@ class VectorDB:
         self.persist = persist
         self._db: DBConnection | None = None
         self._table: Table | None = None
+        self._table_name: str = "code_chunks"
         self._file_registry_table: Table | None = None
         self._reindex_lock = asyncio.Lock()
 
@@ -45,53 +46,44 @@ class VectorDB:
     def create_table(
         self, table_name: str = "code_chunks", schema: pa.Schema | None = None
     ) -> None:
-        if not self._db:
+        """Open existing table or prepare for creation on first insert.
+
+        LanceDB cannot create tables from empty data, so we defer table creation
+        until the first insert_chunks call.
+        """
+        if self._db is None:
             raise DBUnavailableError("Database not connected")
 
-        if schema is None:
-            schema = pa.schema(
-                [
-                    pa.field("chunk_id", pa.string()),
-                    pa.field("file_id", pa.string()),
-                    pa.field("file_path", pa.string()),
-                    pa.field("relative_path", pa.string()),
-                    pa.field("source_code", pa.string()),
-                    pa.field("context_path", pa.string()),
-                    pa.field("start_line", pa.int32()),
-                    pa.field("end_line", pa.int32()),
-                    pa.field("token_count", pa.int32()),
-                    pa.field("node_type", pa.string()),
-                    pa.field("sequence_number", pa.int32()),
-                    pa.field("language", pa.string()),
-                    pa.field("vector", pa.list_(pa.float32())),
-                    pa.field("model_version", pa.string()),
-                    pa.field("created_at", pa.string()),
-                ]
-            )
+        self._table_name = table_name
 
         try:
             if table_name in self._db.table_names():
                 self._table = self._db.open_table(table_name)
                 logger.info(f"Opened existing table: {table_name}")
             else:
-                empty_data = pa.Table.from_pylist([], schema=schema)
-                self._table = self._db.create_table(table_name, empty_data)
-                logger.info(f"Created new table: {table_name}")
+                # Table will be created on first insert
+                logger.info(f"Table {table_name} will be created on first insert")
         except Exception as e:
             raise DBUnavailableError(
-                f"Failed to create/open table: {str(e)}", {"table_name": table_name}
+                f"Failed to open table: {str(e)}", {"table_name": table_name}
             ) from e
 
     def insert_chunks(self, chunks: list[dict[str, Any]]) -> None:
-        if not self._table:
-            raise DBUnavailableError("Table not initialized")
-
         if not chunks:
             logger.debug("No chunks to insert")
             return
 
         try:
-            self._table.add(chunks)
+            # Create table on first insert if it doesn't exist
+            if self._table is None:
+                if self._db is None:
+                    raise DBUnavailableError("Database not connected")
+                table_name = getattr(self, "_table_name", "code_chunks")
+                self._table = self._db.create_table(table_name, chunks)
+                logger.info(f"Created new table: {table_name}")
+            else:
+                self._table.add(chunks)
+
             logger.info(f"Inserted {len(chunks)} chunks into vector DB")
         except Exception as e:
             raise DBUnavailableError(
@@ -138,7 +130,7 @@ class VectorDB:
         Returns:
             List of chunk records with similarity scores and _distance field.
         """
-        if not self._table:
+        if self._table is None:
             raise DBUnavailableError("Table not initialized")
 
         try:
@@ -155,7 +147,7 @@ class VectorDB:
             ) from e
 
     def delete_by_file_id(self, file_id: UUID) -> None:
-        if not self._table:
+        if self._table is None:
             raise DBUnavailableError("Table not initialized")
 
         try:
@@ -167,7 +159,7 @@ class VectorDB:
             ) from e
 
     def get_stats(self) -> dict[str, Any]:
-        if not self._table:
+        if self._table is None:
             raise DBUnavailableError("Table not initialized")
 
         try:
@@ -182,32 +174,18 @@ class VectorDB:
             raise DBUnavailableError(f"Failed to get stats: {str(e)}") from e
 
     def create_file_registry_table(self) -> None:
-        """Create or open the file_registry table for persisting File metadata.
+        """Open or prepare file_registry table for persisting File metadata.
 
         This table enables:
         - Startup reconciliation by comparing persisted timestamps with filesystem
         - Efficient re-indexing by tracking last_indexed timestamps
         - Fast lookups by absolute_path during file watcher events
         - Crash recovery by resuming from last known state
-        """
-        if not self._db:
-            raise DBUnavailableError("Database not connected")
 
-        schema = pa.schema(
-            [
-                pa.field("file_id", pa.string()),
-                pa.field("absolute_path", pa.string()),
-                pa.field("relative_path", pa.string()),
-                pa.field("language", pa.string()),
-                pa.field("last_modified", pa.string()),  # ISO format datetime
-                pa.field("last_indexed", pa.string()),  # ISO format datetime
-                pa.field(
-                    "parse_status", pa.string()
-                ),  # SUCCESS | SYNTAX_ERROR | SKIPPED
-                pa.field("error_message", pa.string()),
-                pa.field("chunk_count", pa.int32()),
-            ]
-        )
+        Table will be created on first upsert_file call if it doesn't exist.
+        """
+        if self._db is None:
+            raise DBUnavailableError("Database not connected")
 
         try:
             table_name = "file_registry"
@@ -215,14 +193,11 @@ class VectorDB:
                 self._file_registry_table = self._db.open_table(table_name)
                 logger.info("Opened existing file_registry table")
             else:
-                empty_data = pa.Table.from_pylist([], schema=schema)
-                self._file_registry_table = self._db.create_table(
-                    table_name, empty_data
-                )
-                logger.info("Created new file_registry table")
+                # Table will be created on first upsert
+                logger.info("File registry table will be created on first file insert")
         except Exception as e:
             raise DBUnavailableError(
-                f"Failed to create/open file_registry table: {str(e)}"
+                f"Failed to open file_registry table: {str(e)}"
             ) from e
 
     def load_file_registry(self) -> list[File]:
@@ -231,8 +206,10 @@ class VectorDB:
         Returns:
             List of File objects representing all indexed files.
         """
-        if not self._file_registry_table:
-            raise DBUnavailableError("File registry table not initialized")
+        # If table doesn't exist yet, return empty list
+        if self._file_registry_table is None:
+            logger.info("File registry table not yet created, returning empty list")
+            return []
 
         try:
             records = self._file_registry_table.to_pandas().to_dict("records")
@@ -264,14 +241,7 @@ class VectorDB:
         Args:
             file: File object to persist.
         """
-        if not self._file_registry_table:
-            raise DBUnavailableError("File registry table not initialized")
-
         try:
-            # Delete existing record if it exists
-            self._file_registry_table.delete(f"file_id = '{str(file.file_id)}'")
-
-            # Insert new record
             file_data = [
                 {
                     "file_id": str(file.file_id),
@@ -285,7 +255,21 @@ class VectorDB:
                     "chunk_count": file.chunk_count,
                 }
             ]
-            self._file_registry_table.add(file_data)
+
+            # Create table on first insert if it doesn't exist
+            if self._file_registry_table is None:
+                if self._db is None:
+                    raise DBUnavailableError("Database not connected")
+                self._file_registry_table = self._db.create_table(
+                    "file_registry", file_data
+                )
+                logger.info("Created new file_registry table")
+            else:
+                # Delete existing record if it exists
+                self._file_registry_table.delete(f"file_id = '{str(file.file_id)}'")
+                # Insert new record
+                self._file_registry_table.add(file_data)
+
             logger.debug(f"Upserted file: {file.relative_path}")
         except Exception as e:
             raise DBUnavailableError(

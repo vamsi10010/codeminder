@@ -30,7 +30,7 @@ class Embedder:
         else:
             device = "cpu"
             logger.info("Using CPU for embeddings")
-        return device
+        return "cpu"
 
     def load_model(self) -> None:
         try:

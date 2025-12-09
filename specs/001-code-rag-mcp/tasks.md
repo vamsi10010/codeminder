@@ -94,12 +94,12 @@
 
 #### Indexing Service
 
-- [ ] T036 [US1] Implement file scanner in src/codeminder/parser/scanner.py (recursive directory traversal, extension filtering, excluded patterns)
-- [ ] T037 [US1] Implement indexing service in src/codeminder/server.py (scan → parse → chunk → embed → store pipeline, persist File records)
-- [ ] T037a [US1] Implement startup reconciliation in src/codeminder/server.py (load file_registry from LanceDB → scan filesystem → compare File.last_modified (mtime) vs File.last_indexed per data-model.md → queue changes: INDEX new, REINDEX modified, DELETE removed)
-- [ ] T037b [US1] Add reconciliation action processor in src/codeminder/server.py (INDEX new files, REINDEX modified files, DELETE removed files)
-- [ ] T038 [US1] Add parallel processing in src/codeminder/server.py (asyncio.Semaphore initialized with config.concurrency_limit, wrap file processing in async context manager for rate limiting)
-- [ ] T039 [US1] Add indexing error aggregation and reporting in src/codeminder/server.py (partial success handling)
+- [X] T036 [US1] Implement file scanner in src/codeminder/parser/scanner.py (recursive directory traversal, extension filtering, excluded patterns)
+- [X] T037 [US1] Implement indexing service in src/codeminder/server.py (scan → parse → chunk → embed → store pipeline, persist File records)
+- [X] T037a [US1] Implement startup reconciliation in src/codeminder/server.py (load file_registry from LanceDB → scan filesystem → compare File.last_modified (mtime) vs File.last_indexed per data-model.md → queue changes: INDEX new, REINDEX modified, DELETE removed)
+- [X] T037b [US1] Add reconciliation action processor in src/codeminder/server.py (INDEX new files, REINDEX modified files, DELETE removed files)
+- [X] T038 [US1] Add parallel processing in src/codeminder/server.py (asyncio.Semaphore initialized with config.concurrency_limit, wrap file processing in async context manager for rate limiting)
+- [X] T039 [US1] Add indexing error aggregation and reporting in src/codeminder/server.py (partial success handling)
 
 #### MCP Server
 

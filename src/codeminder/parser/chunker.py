@@ -1,12 +1,10 @@
 """Adaptive code chunker using AST-based "Largest Valid Node" strategy."""
 
-from typing import List
-
 from tree_sitter import Tree
 
-from codeminder.parser.ast_parser import ASTParser
-from codeminder.parser.token_counter import count_tokens
-from codeminder.storage.models import CodeChunk, File
+from ..parser.ast_parser import ASTParser
+from ..parser.token_counter import count_tokens
+from ..storage.models import CodeChunk, File
 
 
 class Chunker:
@@ -15,16 +13,18 @@ class Chunker:
     def __init__(self, token_limit: int = 2048):
         self.token_limit = token_limit
 
-    def chunk(self, file: File) -> List[CodeChunk]:
+    def chunk(self, file: File) -> list[CodeChunk]:
         """Chunk the parsed file into logical code units."""
-        chunks: List[CodeChunk] = []
+        chunks: list[CodeChunk] = []
         tree = ASTParser.parse_file(file.absolute_path)
         cursor = tree.walk()
         self._chunk_with_cursor(tree, file, cursor, chunks)
         file.chunk_count = len(chunks)
         return sorted(chunks, key=lambda c: c.start_line)
 
-    def _chunk_with_cursor(self, tree: Tree, file: File, cursor, chunks: List[CodeChunk]) -> None:
+    def _chunk_with_cursor(
+        self, tree: Tree, file: File, cursor, chunks: list[CodeChunk]
+    ) -> None:
         """Recursively chunk using TreeCursor for efficient traversal."""
         node = cursor.node
 
