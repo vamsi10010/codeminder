@@ -47,7 +47,7 @@ python eval/run_chunking_compare.py \
   --token-limit 512 \
   --line-span 40
 ```
-Outputs JSON with success@1/k, mean MRR, and chunk stats for both strategies.
+Outputs JSON with success@1/k, mean MRR, and chunk stats for both strategies. If the repo has a built-in `LineChunker` (newer code), it will use that; otherwise it falls back to a minimal line-based chunker bundled in the script.
 
 ## Notes
 - Both scripts run in-memory (`persist_index=False`) for speed; point `--codebase` to any repo you want to benchmark.

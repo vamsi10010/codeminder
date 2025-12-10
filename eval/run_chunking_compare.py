@@ -7,7 +7,7 @@ import math
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 from uuid import uuid4
 
 from codeminder.config import Configuration
@@ -19,6 +19,21 @@ from codeminder.search.searcher import Searcher
 from codeminder.storage.models import CodeChunk, File, ParseStatus
 from codeminder.storage.vector_db import VectorDB
 from codeminder.server import IndexingService
+
+# Prefer the repo's built-in line chunker if present (newer branch),
+# otherwise fall back to a lightweight local implementation.
+try:
+    from codeminder.parser.line_chunker import LineChunker as BuiltinLineChunker  # type: ignore
+
+    HAS_LINE_CHUNKER = True
+except Exception:  # pragma: no cover - optional dependency for older code
+    BuiltinLineChunker = None  # type: ignore
+    HAS_LINE_CHUNKER = False
+
+
+class LineChunkerLike(Protocol):
+    def chunk(self, file: File) -> list[CodeChunk]:
+        ...
 
 
 def load_golden(path: Path) -> list[dict[str, Any]]:
@@ -73,33 +88,38 @@ def evaluate(searcher: Searcher, golden: list[dict[str, Any]], k: int) -> EvalRe
     )
 
 
-def line_chunks_for_file(
-    file: File, max_lines: int, token_limit: int
-) -> list[CodeChunk]:
-    """Create simple line-based chunks capped by max_lines and token_limit."""
-    chunks: list[CodeChunk] = []
-    text = Path(file.absolute_path).read_text().splitlines()
-    start = 0
-    while start < len(text):
-        end = min(len(text), start + max_lines)
-        window = "\n".join(text[start:end])
-        # If token limit exceeded, halve window until under limit (coarse but safe)
-        while count_tokens(window) > token_limit and end - start > 1:
-            end = start + math.ceil((end - start) / 2)
-            window = "\n".join(text[start:end])
+class FallbackLineChunker:
+    """Simple line-based chunker for branches without BuiltinLineChunker."""
 
-        chunk = CodeChunk(
-            file_id=file.file_id,
-            source_code=window,
-            context_path=f"{file.relative_path}:{start + 1}-{end}",
-            start_line=start + 1,
-            end_line=end,
-            token_count=count_tokens(window),
-            node_type="line_chunk",
-        )
-        chunks.append(chunk)
-        start = end
-    return chunks
+    def __init__(self, max_lines: int, token_limit: int):
+        self.max_lines = max_lines
+        self.token_limit = token_limit
+
+    def chunk(self, file: File) -> list[CodeChunk]:
+        chunks: list[CodeChunk] = []
+        text = Path(file.absolute_path).read_text().splitlines()
+        start = 0
+        while start < len(text):
+            end = min(len(text), start + self.max_lines)
+            window = "\n".join(text[start:end])
+            # If token limit exceeded, halve window until under limit (coarse but safe)
+            while count_tokens(window) > self.token_limit and end - start > 1:
+                end = start + math.ceil((end - start) / 2)
+                window = "\n".join(text[start:end])
+
+            chunk = CodeChunk(
+                file_id=file.file_id,
+                source_code=window,
+                context_path=f"{file.relative_path}:{start + 1}-{end}",
+                start_line=start + 1,
+                end_line=end,
+                token_count=count_tokens(window),
+                node_type="line_chunk",
+            )
+            chunks.append(chunk)
+            start = end
+        file.chunk_count = len(chunks)
+        return chunks
 
 
 def build_line_index(
@@ -107,12 +127,20 @@ def build_line_index(
     embedder: Embedder,
     line_span: int,
     token_limit: int,
-) -> tuple[VectorDB, dict[str, Any]]:
+) -> tuple[VectorDB, dict[str, Any], bool]:
     scanner = FileScanner(str(codebase))
     vector_db = VectorDB(persist=False)
     vector_db.connect()
     vector_db.create_table()
     vector_db.create_file_registry_table()
+
+    # Pick the repo's line chunker if available, otherwise use fallback.
+    if HAS_LINE_CHUNKER:
+        line_chunker: LineChunkerLike = BuiltinLineChunker(token_limit=token_limit)  # type: ignore
+        using_builtin = True
+    else:
+        line_chunker = FallbackLineChunker(max_lines=line_span, token_limit=token_limit)
+        using_builtin = False
 
     chunk_counts: list[int] = []
 
@@ -128,7 +156,7 @@ def build_line_index(
             parse_status=ParseStatus.SUCCESS,
         )
 
-        chunks = line_chunks_for_file(file, max_lines=line_span, token_limit=token_limit)
+        chunks = line_chunker.chunk(file)
         chunk_counts.append(len(chunks))
         chunk_dicts: list[dict[str, Any]] = []
         for chunk in chunks:
@@ -164,8 +192,9 @@ def build_line_index(
         "files_indexed": len(chunk_counts),
         "chunks_total": sum(chunk_counts),
         "chunks_per_file_avg": sum(chunk_counts) / len(chunk_counts) if chunk_counts else 0.0,
+        "using_builtin_line_chunker": using_builtin,
     }
-    return vector_db, chunk_stats
+    return vector_db, chunk_stats, using_builtin
 
 
 async def build_ast_index(config: Configuration) -> tuple[VectorDB, Embedder, dict[str, Any]]:
@@ -225,7 +254,7 @@ async def main() -> None:
     ast_eval = evaluate(ast_searcher, golden, args.max_results)
     ast_eval.chunk_stats = ast_chunk_stats
 
-    line_db, line_chunk_stats = build_line_index(
+    line_db, line_chunk_stats, using_builtin = build_line_index(
         args.codebase, embedder, args.line_span, args.token_limit
     )
     line_searcher = Searcher(line_db, embedder)
@@ -244,6 +273,7 @@ async def main() -> None:
             "success_at_k": line_eval.success_at_k,
             "mean_mrr": line_eval.mean_mrr,
             "chunk_stats": line_eval.chunk_stats,
+            "using_builtin_line_chunker": using_builtin,
         },
     }
 
