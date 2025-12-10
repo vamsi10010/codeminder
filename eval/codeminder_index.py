@@ -3,7 +3,6 @@
 Run this ahead of Codex/Gemini so the codebase is pre-indexed and persisted.
 """
 
-import argparse
 import asyncio
 import json
 import sys
@@ -20,17 +19,7 @@ from codeminder.server import IndexingService
 
 
 async def main() -> None:
-    parser = argparse.ArgumentParser(description="Pre-index a codebase for CodeMinder")
-    parser.add_argument(
-        "--config",
-        type=Path,
-        default=Path(".codeminder.json"),
-        help="Path to CodeMinder config file",
-    )
-    args = parser.parse_args()
-
-    config_path = args.config
-    config = Configuration.load_from_file(str(config_path))
+    config = Configuration(max_search_results=10)
 
     # Force persistence so the index can be reused by external callers.
     config.persist_index = True

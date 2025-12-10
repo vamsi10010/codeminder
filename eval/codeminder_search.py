@@ -24,22 +24,16 @@ from codeminder.storage.vector_db import VectorDB
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run a CodeMinder search against an existing index")
     parser.add_argument("--query", required=True, help="Natural language search query")
-    parser.add_argument("--limit", type=int, default=5, help="Maximum results to return")
+    parser.add_argument("--limit", type=int, default=10, help="Maximum results to return")
     parser.add_argument(
         "--similarity-threshold",
         type=float,
         default=0.0,
         help="Minimum similarity score (0-1) to include",
     )
-    parser.add_argument(
-        "--config",
-        type=Path,
-        default=Path(".codeminder.json"),
-        help="Path to CodeMinder config file",
-    )
     args = parser.parse_args()
 
-    config = Configuration.load_from_file(str(args.config))
+    config = Configuration(max_search_results=args.limit)
     # Ensure we look for a persisted DB.
     config.persist_index = True
 
