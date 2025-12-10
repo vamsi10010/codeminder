@@ -37,6 +37,7 @@ uv sync
 # Activate the virtual environment
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
+Alternatively, you can use `uvx` to skip cloning the repository.
 
 ### 2. Create Configuration File
 
@@ -78,6 +79,10 @@ codeminder
 # Or directly with Python
 python -m codeminder.mcp_server
 ```
+Or use `uvx` as follows:
+```bash
+uvx --from git+https://github.com/vamsi10010/codeminder codeminder
+```
 
 **Output** (first run):
 ```
@@ -118,7 +123,6 @@ Edit `~/.config/claude/claude_desktop_config.json`:
   "mcpServers": {
     "codeminder": {
       "command": "/path/to/codeminder/.venv/bin/codeminder",
-      "workingDirectory": "/path/to/your/codebase"
     }
   }
 }
@@ -131,7 +135,18 @@ Edit `~/.config/claude/claude_desktop_config.json`:
     "codeminder": {
       "command": "/path/to/codeminder/.venv/bin/python",
       "args": ["-m", "codeminder.mcp_server"],
-      "workingDirectory": "/path/to/your/codebase"
+    }
+  }
+}
+```
+
+**Or use `uvx` without cloning the repo**:
+```json
+{
+  "mcpServers": {
+    "codeminder": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/vamsi10010/codeminder", "codeminder"],
     }
   }
 }
