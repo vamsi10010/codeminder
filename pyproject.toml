@@ -7,7 +7,7 @@ name = "codeminder"
 version = "0.1.0"
 description = "MCP server for semantic code search using RAG"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=2.13.3",
     "lancedb>=0.25.3",
